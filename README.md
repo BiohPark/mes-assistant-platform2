@@ -9,7 +9,7 @@ Syncade ET 개발 업무를 단계별 assistant(OpenWebUI)와 함께 진행하�
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5174
 npm run build      # dist/ 정적 파일 (사내 웹서버 어디든 배포 가능)
 npm run preview    # 빌드 결과 미리보기
 npm test           # 도메인/DB/SSE 단위 테스트
