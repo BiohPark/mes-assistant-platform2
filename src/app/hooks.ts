@@ -3,6 +3,7 @@ import { db } from '@/db/schema'
 import { getSettings } from '@/db/repositories/settings'
 import type { Actor } from '@/db/repositories/activity'
 import type { ID, Settings, User } from '@/domain/types'
+import { useTabUserId } from './tabUser'
 
 export function useSettings(): Settings | undefined {
   return useLiveQuery(() => getSettings(), [])
@@ -17,15 +18,22 @@ export function useUserMap(): Map<ID, User> {
   return new Map(users.map((u) => [u.id, u]))
 }
 
-export function useCurrentUser(): User | undefined {
+/** 현재 사용자 ID: 탭별 전환값이 있으면 우선, 없으면 설정의 기본 사용자 */
+export function useCurrentUserId(): ID | undefined {
   const settings = useSettings()
-  return useLiveQuery(() => (settings ? db.users.get(settings.currentUserId) : undefined), [settings?.currentUserId])
+  const tabUser = useTabUserId()
+  return tabUser ?? settings?.currentUserId
+}
+
+export function useCurrentUser(): User | undefined {
+  const id = useCurrentUserId()
+  return useLiveQuery(() => (id ? db.users.get(id) : undefined), [id])
 }
 
 /** 변경 작업에 넘길 actor. 사용자 로딩 전에는 undefined */
 export function useActor(): Actor | undefined {
-  const settings = useSettings()
-  return settings ? { userId: settings.currentUserId } : undefined
+  const id = useCurrentUserId()
+  return id ? { userId: id } : undefined
 }
 
 export function useTemplates() {

@@ -14,6 +14,7 @@ import { MessageBubble } from './MessageBubble'
 import { Composer } from './Composer'
 import { SaveAsOutputDialog } from './SaveAsOutputDialog'
 import { ModelPicker } from './ModelPicker'
+import { notifyTyping, useTypingUsers } from '@/app/presence'
 
 interface ChatViewProps {
   task: Task
@@ -35,6 +36,8 @@ export function ChatView({ task, step, files, template, readOnly }: ChatViewProp
   const actor = useActor()
   const users = useUserMap()
   const chat = useChat(actor, task, step, files, template)
+  const typingIds = useTypingUsers(chat.activeThread?.id, actor?.userId)
+  const remoteStreaming = !chat.streaming && chat.messages.some((m) => m.status === 'streaming')
   const participantIds = Array.from(new Set(chat.messages.filter((m) => m.role === 'user' && m.authorId).map((m) => m.authorId!)))
   const [saveTarget, setSaveTarget] = useState<Message | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -124,13 +127,25 @@ export function ChatView({ task, step, files, template, readOnly }: ChatViewProp
         {chat.messages.map((m) => (
           <MessageBubble key={m.id} message={m} files={fileMap} assistantName={step.assistant?.displayName} onSaveAsOutput={readOnly ? undefined : setSaveTarget} />
         ))}
+        {(typingIds.length > 0 || remoteStreaming) && (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex gap-0.5">
+              <span className="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+              <span className="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+              <span className="size-1 animate-bounce rounded-full bg-muted-foreground" />
+            </span>
+            {typingIds.length > 0 && <span>{typingIds.map((id) => users.get(id)?.name ?? id).join(', ')} 님이 입력 중…</span>}
+            {remoteStreaming && <span>다른 참여자의 요청에 assistant가 응답 중…</span>}
+          </div>
+        )}
       </div>
 
       {!readOnly && (
         <Composer
           disabled={!actor}
-          streaming={chat.streaming}
+          streaming={chat.streaming || remoteStreaming}
           onSend={handleSend}
+          onTyping={() => chat.activeThread && actor && notifyTyping(chat.activeThread.id, actor.userId)}
           onStop={chat.stop}
           suggestions={chat.messages.length === 0 ? SUGGESTIONS[step.key] : undefined}
         />

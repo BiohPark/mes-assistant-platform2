@@ -26,14 +26,24 @@ npm test           # 도메인/DB/SSE 단위 테스트
 |---|---|
 | `/` | 워크플로우 보드 — 단계 클릭 필터, 목록형/워크플로우형 토글, KPI |
 | `/tasks/:id/steps/:stepId` | 업무 상세 — 스테퍼, 단계별 assistant 채팅, 입력 파일 선택, 체크리스트, 파일함, 메모, 이력 (외부 시스템 제공용 딥링크) |
-| `/templates`, `/templates/:id` | 워크플로우 템플릿 편집기 (드래그 정렬, assistant 매핑, 체크리스트) |
+| `/templates`, `/templates/:id` | 워크플로우 템플릿 편집기 + Task 모듈 라이브러리 (라이브러리에서 가져오기/저장) |
 | `/reports` | 일별·주별·담당자별·워크플로우별 리포트, 비효율 신호, assistant 피드백 요약 |
 | `/settings` | LLM 연결(Mock/Live), 데이터 내보내기/가져오기 |
 | 상단 "시스템 assistant" | 자연어로 업무/템플릿/단계 생성 (도구 호출 → 확인 후 적용) |
 
+## 구조: 업무 ⊃ Task
+
+- **업무** = Task(assistant 연계 단위)의 조합. 템플릿으로 시작하거나, 모듈을 직접 골라 조합하거나, Task 없이 **수동 업무**로 진행할 수 있습니다.
+- 진행 중인 업무도 "더 보기 → 워크플로우 구성"에서 Task를 추가/순서 변경/제거할 수 있고, Task를 모듈 라이브러리에 저장해 재사용합니다.
+- assistant 모델은 **이 대화 › 이 Task › 업무 기본 › 템플릿 기본 › 설정 기본** 순으로 결정됩니다. 채팅 헤더의 모델 버튼에서 범위를 골라 바꿉니다.
+
+## 실시간 협업 (데모)
+
+상단 사용자 전환은 **탭에만** 적용됩니다. 탭 두 개를 열어 각각 다른 사용자로 같은 Task 대화에 참여하면 메시지·assistant 응답·체크·파일이 실시간으로 동기화되고, 입력 중 표시가 뜹니다. 서로 다른 PC 간 실시간은 백엔드(WebSocket)가 필요합니다 — docs/design.md 참조.
+
 ## 실제 LLM 연결
 
-설정 → Live 모드 → Base URL / API Key / 모델 입력 → 연결 테스트.
+설정 → Live 모드 → 프리셋(OpenWebUI / vLLM·OpenAI 호환 / Ollama) 선택 후 Base URL / API Key 입력 → "목록"으로 서버 모델 확인 → 연결 테스트.
 
 - OpenWebUI: `http://<host>/api` (내부적으로 `/api/chat/completions`, `/api/models` 호출)
 - 일반 OpenAI-compatible 서버: `http://<host>/v1`

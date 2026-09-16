@@ -1,18 +1,22 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { Bot, Copy, Hand, Plus, Trash2, Workflow } from 'lucide-react'
+import { Bot, Copy, Hand, Library, Plus, Trash2, Workflow } from 'lucide-react'
 import { TopBar } from '@/app/TopBar'
 import { useActor, useTemplates } from '@/app/hooks'
 import { Button } from '@/components/ui/button'
 import { db } from '@/db/schema'
 import { deleteTemplate, duplicateTemplate, newWorkflowTemplate, saveTemplate } from '@/db/repositories/templates'
 import { formatDate } from '@/lib/dates'
+import { useModules } from '@/features/modules/ModuleLibraryPicker'
+import { deleteModule } from '@/db/repositories/modules'
+import { STEP_KEY_LABEL } from '@/domain/types'
 
 export function TemplatesPage() {
   const templates = useTemplates()
   const actor = useActor()
   const navigate = useNavigate()
+  const modules = useModules()
   const usage = useLiveQuery(async () => {
     const tasks = await db.tasks.toArray()
     const m: Record<string, number> = {}
@@ -91,6 +95,40 @@ export function TemplatesPage() {
                     <Trash2 />
                   </Button>
                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <h2 className="mt-6 mb-1 flex items-center gap-2 text-sm font-semibold">
+          <Library className="size-4" />
+          Task 모듈 라이브러리 <span className="font-normal text-muted-foreground">{modules.length}</span>
+        </h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          업무를 구성하는 실질 단위입니다. 템플릿 편집기나 업무 화면의 "워크플로우 구성"에서 갈아끼워 쓸 수 있고, 진행 중인 Task를 라이브러리에 저장할 수도 있습니다.
+        </p>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {modules.map((m) => (
+            <div key={m.id} className="flex flex-col rounded-lg border bg-card p-3">
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <span className="size-2 rounded-full" style={{ backgroundColor: m.mode === 'manual' ? '#9ca3af' : m.color }} />
+                {m.name}
+                {m.mode === 'manual' ? <Hand className="size-3 text-muted-foreground" /> : <Bot className="size-3 text-violet-600" />}
+                <span className="ml-auto rounded bg-muted px-1 text-[10px] text-muted-foreground">{STEP_KEY_LABEL[m.key]}</span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{m.description || '설명 없음'}</p>
+              <div className="mt-2 flex items-center text-[10px] text-muted-foreground">
+                체크 {m.checklist.length} · {m.assistant?.modelId || (m.mode === 'assistant' ? '기본 모델' : '수동')}
+                {m.tags.length > 0 && ` · ${m.tags.join(', ')}`}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="모듈 삭제"
+                  className="ml-auto hover:text-destructive"
+                  onClick={() => deleteModule(m.id).then(() => toast.success('모듈을 삭제했습니다.'))}
+                >
+                  <Trash2 />
+                </Button>
               </div>
             </div>
           ))}

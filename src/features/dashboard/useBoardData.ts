@@ -86,10 +86,11 @@ export function boardColumns(template: WorkflowTemplate | undefined, fallbackCol
       seen.add(s.key)
       cols.push({ key: s.key, label: s.name, color: s.color, mode: s.mode })
     }
+    if (!seen.has('CUSTOM')) cols.push({ key: 'CUSTOM', label: '수동/기타', color: fallbackColors.CUSTOM })
     return [...cols, { key: 'DONE', label: '완료', color: '#64748b' }]
   }
   return [
-    ...STEP_KEYS.filter((k) => k !== 'CUSTOM').map((k) => ({ key: k, label: STEP_LABEL_FULL[k], color: fallbackColors[k] })),
+    ...STEP_KEYS.map((k) => ({ key: k, label: STEP_LABEL_FULL[k], color: fallbackColors[k] })),
     { key: 'DONE', label: '완료', color: '#64748b' },
   ]
 }
@@ -101,5 +102,5 @@ const STEP_LABEL_FULL: Record<StepKey, string> = {
   TEST: '테스트',
   PROTOCOL: '프로토콜 검증',
   DEPLOY: '배포/검증',
-  CUSTOM: '기타',
+  CUSTOM: '수동/기타',
 }

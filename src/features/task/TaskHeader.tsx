@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { CalendarClock, CheckCircle2, ExternalLink, Link2, MoreHorizontal, PauseCircle, PlayCircle, Plus } from 'lucide-react'
+import { CalendarClock, CheckCircle2, ExternalLink, Link2, MoreHorizontal, PauseCircle, PlayCircle, Plus, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import type { TaskData } from './useTaskData'
 import { TaskCompleteDialog } from './TaskCompleteDialog'
 import { InsertStepDialog } from './InsertStepDialog'
+import { ComposeWorkflowDialog } from './ComposeWorkflowDialog'
 
 interface TaskHeaderProps {
   data: TaskData
@@ -30,6 +31,7 @@ export function TaskHeader({ data, selectedStepId }: TaskHeaderProps) {
   const actor = useActor()
   const [completeOpen, setCompleteOpen] = useState(false)
   const [insertOpen, setInsertOpen] = useState(false)
+  const [composeOpen, setComposeOpen] = useState(false)
   const daysLeft = daysUntil(task.dueDate)
   const overdue = task.status === 'active' && daysLeft !== undefined && daysLeft < 0
 
@@ -51,7 +53,7 @@ export function TaskHeader({ data, selectedStepId }: TaskHeaderProps) {
             <span className="font-mono">{task.code}</span>
             <TaskStatusBadge status={task.status} />
             <PriorityBadge priority={task.priority} />
-            {data.template && <span className="rounded bg-muted px-1.5 py-px">{data.template.name}</span>}
+            <span className="rounded bg-muted px-1.5 py-px">{data.template?.name ?? (data.steps.length ? '직접 구성' : '수동 업무')}</span>
           </div>
           <h1 className="mt-1 text-base font-semibold leading-snug">{task.title}</h1>
           {task.summary && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{task.summary}</p>}
@@ -85,7 +87,11 @@ export function TaskHeader({ data, selectedStepId }: TaskHeaderProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setInsertOpen(true)}>
                   <Plus />
-                  단계 추가
+                  Task 추가
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setComposeOpen(true)}>
+                  <SlidersHorizontal />
+                  워크플로우 구성 (순서/제거)
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {task.status === 'active' ? (
@@ -119,6 +125,7 @@ export function TaskHeader({ data, selectedStepId }: TaskHeaderProps) {
       </div>
       <TaskCompleteDialog open={completeOpen} onOpenChange={setCompleteOpen} data={data} />
       <InsertStepDialog open={insertOpen} onOpenChange={setInsertOpen} data={data} afterStepId={selectedStepId} />
+      <ComposeWorkflowDialog open={composeOpen} onOpenChange={setComposeOpen} data={data} />
     </div>
   )
 }

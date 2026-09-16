@@ -41,6 +41,8 @@ export interface ChecklistTemplateItem {
 
 export interface StepTemplate {
   id: ID
+  /** 라이브러리 모듈에서 가져온 경우 원본 모듈 ID */
+  moduleId?: ID
   key: StepKey
   name: string
   description: string
@@ -50,6 +52,16 @@ export interface StepTemplate {
   outputSpec: string[]
   checklist: ChecklistTemplateItem[]
   color: string
+}
+
+/**
+ * Task 모듈: assistant와 연계되는 실질 업무 단위의 재사용 정의.
+ * 템플릿은 모듈을 조합한 것이고, 업무는 모듈을 갈아끼워 구성할 수 있다.
+ */
+export interface TaskModule extends StepTemplate {
+  tags: string[]
+  createdBy: ID
+  updatedAt: ISODate
 }
 
 export interface WorkflowTemplate {
@@ -80,6 +92,7 @@ export interface Task {
   summary: string
   templateId: ID
   status: TaskStatus
+  /** 현재 Task. 모듈 없는 수동 업무는 빈 문자열 */
   currentStepId: ID
   ownerId: ID
   assigneeIds: ID[]
@@ -200,6 +213,8 @@ export type ActivityType =
   | 'step.skipped'
   | 'step.reopened'
   | 'step.mode_changed'
+  | 'step.removed'
+  | 'step.reordered'
   | 'model.changed'
   | 'step.navigated'
   | 'checklist.checked'

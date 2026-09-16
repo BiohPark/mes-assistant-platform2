@@ -41,13 +41,13 @@ export function StepPanel({ data, step }: StepPanelProps) {
   async function skip() {
     if (!actor) return
     await runStepAction(actor, step.id, 'skip')
-    toast.info(`"${step.name}" 단계를 건너뛰었습니다.`)
+    toast.info(`"${step.name}" Task를 건너뛰었습니다.`)
     goTo(nextStep?.id)
   }
   async function reopen() {
     if (!actor) return
     await runStepAction(actor, step.id, 'reopen')
-    toast.info(`"${step.name}" 단계를 다시 열었습니다. 현재 단계로 설정됩니다.`)
+    toast.info(`"${step.name}" Task를 다시 열었습니다. 현재 Task로 설정됩니다.`)
   }
 
   return (
@@ -64,17 +64,17 @@ export function StepPanel({ data, step }: StepPanelProps) {
             {isCurrent ? (
               <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-foreground">
                 <MapPin className="size-3" />
-                현재 단계
+                현재 Task
               </span>
             ) : (
               !taskLocked && (
                 <Button variant="link" size="xs" className="h-auto p-0 text-[11px]" onClick={() => actor && navigateToStep(actor, task.id, step.id)}>
-                  이 단계를 현재 단계로
+                  이 Task를 현재 Task로
                 </Button>
               )
             )}
           </div>
-          <p className="truncate text-[11px] text-muted-foreground">{step.description || (manual ? '수동으로 진행하는 단계입니다. 메모와 첨부로 진행 내용을 남기세요.' : '')}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{step.description || (manual ? '수동으로 진행하는 Task입니다. 메모와 첨부로 진행 내용을 남기세요.' : '')}</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           {step.feedback && (
@@ -97,7 +97,7 @@ export function StepPanel({ data, step }: StepPanelProps) {
                     {manual ? 'assistant로 진행' : '수동으로 진행'}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>이 단계를 assistant에게 이관하지 않고 직접 진행할 수 있습니다 (회색 표시)</TooltipContent>
+                <TooltipContent>이 Task를 assistant에게 이관하지 않고 직접 진행할 수 있습니다 (회색 표시)</TooltipContent>
               </Tooltip>
               {closed ? (
                 <Button variant="outline" size="sm" onClick={reopen}>
@@ -112,7 +112,7 @@ export function StepPanel({ data, step }: StepPanelProps) {
                   </Button>
                   <Button size="sm" onClick={() => setCompleteOpen(true)}>
                     <CheckCircle2 data-icon="inline-start" />
-                    단계 완료
+                    Task 완료
                   </Button>
                 </>
               )}
@@ -143,7 +143,7 @@ export function StepPanel({ data, step }: StepPanelProps) {
             <div className="flex min-h-0 flex-1 flex-col p-4">
               <div className="mb-3 rounded-lg border border-dashed bg-card/70 p-3 text-xs text-muted-foreground">
                 <Hand className="mr-1 inline size-3.5" />
-                수동 진행 단계입니다. assistant 대화 없이 메모와 첨부파일로 진행 내용을 기록합니다. 언제든 상단에서 "assistant로 진행"으로 전환할 수 있습니다.
+                수동 진행 Task입니다. assistant 대화 없이 메모와 첨부파일로 진행 내용을 기록합니다. 언제든 상단에서 "assistant로 진행"으로 전환할 수 있습니다.
               </div>
               <div className="min-h-0 flex-1">
                 <NotesPanel taskId={task.id} stepId={step.id} notes={notes} files={files} placeholder="진행 메모 (예: 개발 완료, 코드 리뷰 링크, DBA 승인 대기 등)" />

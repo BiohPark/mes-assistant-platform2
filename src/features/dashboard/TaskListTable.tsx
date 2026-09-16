@@ -62,7 +62,9 @@ export function TaskListTable({ rows }: TaskListTableProps) {
                   <span className="text-xs text-muted-foreground">완료</span>
                 ) : r.currentStep ? (
                   <StepChip name={r.currentStep.name} color={r.currentStep.color} mode={r.currentStep.mode} />
-                ) : null}
+                ) : (
+                  <span className="text-xs text-muted-foreground">수동 업무</span>
+                )}
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">

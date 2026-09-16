@@ -11,8 +11,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { StepChip } from '@/components/StatusBadges'
 import { useActor, useTemplates, useUsers } from '@/app/hooks'
 import { createTaskFromTemplate } from '@/db/repositories/tasks'
+import { stepTemplateFromModule } from '@/db/repositories/modules'
 import { PRIORITY_LABEL } from '@/lib/labels'
 import type { Priority } from '@/domain/types'
+import { ModuleLibraryPicker, useModules } from '@/features/modules/ModuleLibraryPicker'
+import { cn } from '@/lib/utils'
 
 interface NewTaskDialogProps {
   open: boolean
@@ -20,14 +23,25 @@ interface NewTaskDialogProps {
   defaultTemplateId?: string
 }
 
+type Compose = 'template' | 'modules' | 'manual'
+
+const COMPOSE_OPTIONS: Array<{ key: Compose; label: string; hint: string }> = [
+  { key: 'template', label: '워크플로우 템플릿', hint: '정해진 Task 조합으로 시작' },
+  { key: 'modules', label: '직접 구성', hint: 'Task 모듈을 골라 조합' },
+  { key: 'manual', label: '수동 업무', hint: 'Task 없이 메모/첨부로 진행' },
+]
+
 export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTaskDialogProps) {
   const templates = useTemplates()
+  const modules = useModules()
   const users = useUsers()
   const actor = useActor()
   const navigate = useNavigate()
+  const [compose, setCompose] = useState<Compose>('template')
   const [title, setTitle] = useState('')
   const [summary, setSummary] = useState('')
   const [templateId, setTemplateId] = useState(defaultTemplateId ?? '')
+  const [picked, setPicked] = useState<string[]>([])
   const [priority, setPriority] = useState<Priority>('normal')
   const [dueDate, setDueDate] = useState('')
   const [externalId, setExternalId] = useState('')
@@ -36,6 +50,8 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
   const [submitting, setSubmitting] = useState(false)
 
   const tpl = templates.find((t) => t.id === (templateId || templates[0]?.id))
+  const pickedModules = picked.map((id) => modules.find((m) => m.id === id)).filter((m) => m !== undefined)
+  const previewSteps = compose === 'template' ? (tpl?.steps ?? []) : compose === 'modules' ? pickedModules : []
 
   async function submit() {
     if (!actor) return
@@ -43,8 +59,12 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
       toast.error('제목을 입력해 주세요.')
       return
     }
-    if (!tpl) {
+    if (compose === 'template' && !tpl) {
       toast.error('워크플로우 템플릿을 선택해 주세요.')
+      return
+    }
+    if (compose === 'modules' && pickedModules.length === 0) {
+      toast.error('Task 모듈을 하나 이상 선택하거나 "수동 업무"를 선택하세요.')
       return
     }
     setSubmitting(true)
@@ -52,7 +72,8 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
       const task = await createTaskFromTemplate(actor, {
         title: title.trim(),
         summary: summary.trim(),
-        templateId: tpl.id,
+        templateId: compose === 'template' ? tpl?.id : undefined,
+        modules: compose === 'modules' ? pickedModules.map(stepTemplateFromModule) : compose === 'manual' ? [] : undefined,
         ownerId: actor.userId,
         assigneeIds: Array.from(new Set([actor.userId, ...assignees])),
         priority,
@@ -60,7 +81,7 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
         externalRef: externalId.trim()
           ? { system: 'ITSM', id: externalId.trim(), url: `https://itsm.example.internal/tickets/${externalId.trim()}` }
           : undefined,
-        defaultModelId: modelOverride ?? tpl.defaultModelId,
+        defaultModelId: modelOverride ?? (compose === 'template' ? tpl?.defaultModelId : undefined),
       })
       toast.success(`${task.code} 업무를 생성했습니다.`)
       onOpenChange(false)
@@ -74,10 +95,10 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>새 업무</DialogTitle>
-          <DialogDescription>워크플로우 템플릿을 선택하면 단계와 체크리스트가 자동 생성됩니다.</DialogDescription>
+          <DialogDescription>업무는 Task(assistant 단위)의 조합입니다. 템플릿으로 시작하거나, 모듈을 직접 고르거나, Task 없이 수동으로 진행할 수 있습니다.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
@@ -88,9 +109,27 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
             <Label htmlFor="nt-summary">요약</Label>
             <Textarea id="nt-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} placeholder="배경과 목표를 한두 문장으로" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid gap-1.5">
+            <Label>구성 방식</Label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {COMPOSE_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => setCompose(o.key)}
+                  className={cn('rounded-lg border px-2 py-1.5 text-left', compose === o.key ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
+                >
+                  <div className="text-xs font-medium">{o.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{o.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {compose === 'template' && (
             <div className="grid gap-1.5">
-              <Label>워크플로우</Label>
+              <Label>워크플로우 템플릿</Label>
               <Select value={tpl?.id ?? ''} onValueChange={setTemplateId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="템플릿 선택" />
@@ -104,6 +143,21 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
                 </SelectContent>
               </Select>
             </div>
+          )}
+          {compose === 'modules' && <ModuleLibraryPicker selected={picked} onChange={setPicked} />}
+
+          {previewSteps.length > 0 && (
+            <div className="rounded-lg border bg-muted/40 p-2.5">
+              <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">Task 구성 미리보기 ({previewSteps.length})</div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {previewSteps.map((s, i) => (
+                  <StepChip key={`${s.id}-${i}`} name={s.name} color={s.color} mode={s.mode} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>우선순위</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
@@ -127,28 +181,19 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
               <Label htmlFor="nt-ext">외부 시스템 ID</Label>
               <Input id="nt-ext" value={externalId} onChange={(e) => setExternalId(e.target.value)} placeholder="CR-2026-xxxx" />
             </div>
-            <div className="col-span-2 grid gap-1.5">
-              <Label htmlFor="nt-model">업무 기본 assistant 모델</Label>
-              <Input
-                id="nt-model"
-                value={modelOverride ?? tpl?.defaultModelId ?? ''}
-                onChange={(e) => setModelOverride(e.target.value)}
-                placeholder="비우면 설정의 기본 모델 사용"
-                className="font-mono"
-              />
-              <p className="text-[11px] text-muted-foreground">템플릿 기본값에서 가져옵니다. 단계/대화별로 나중에 바꿀 수 있습니다.</p>
-            </div>
-          </div>
-          {tpl && (
-            <div className="rounded-lg border bg-muted/40 p-2.5">
-              <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">단계 미리보기</div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {tpl.steps.map((s) => (
-                  <StepChip key={s.id} name={s.name} color={s.color} mode={s.mode} />
-                ))}
+            {compose !== 'manual' && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="nt-model">업무 기본 assistant 모델</Label>
+                <Input
+                  id="nt-model"
+                  value={modelOverride ?? (compose === 'template' ? (tpl?.defaultModelId ?? '') : '')}
+                  onChange={(e) => setModelOverride(e.target.value)}
+                  placeholder="비우면 설정의 기본 모델"
+                  className="font-mono"
+                />
               </div>
-            </div>
-          )}
+            )}
+          </div>
           <div className="grid gap-1.5">
             <Label>참여자</Label>
             <div className="flex flex-wrap gap-3">
@@ -156,10 +201,7 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
                 .filter((u) => u.id !== actor?.userId)
                 .map((u) => (
                   <label key={u.id} className="flex items-center gap-1.5 text-sm">
-                    <Checkbox
-                      checked={assignees.includes(u.id)}
-                      onCheckedChange={(c) => setAssignees((prev) => (c ? [...prev, u.id] : prev.filter((id) => id !== u.id)))}
-                    />
+                    <Checkbox checked={assignees.includes(u.id)} onCheckedChange={(c) => setAssignees((prev) => (c ? [...prev, u.id] : prev.filter((id) => id !== u.id)))} />
                     {u.name}
                   </label>
                 ))}

@@ -16,6 +16,12 @@ import { downloadBlob } from '@/db/repositories/files'
 import { useModelList } from '@/llm/useModelList'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+const PRESETS = [
+  { label: 'OpenWebUI', baseUrl: 'http://openwebui.internal/api', model: 'glm-5.2', hint: 'OpenWebUI: /api/chat/completions, /api/models. 워크스페이스 모델(assistant) ID를 그대로 사용' },
+  { label: 'vLLM / OpenAI 호환', baseUrl: 'http://llm.internal:8000/v1', model: '', hint: 'vLLM, LiteLLM, Ollama(/v1) 등 OpenAI-compatible 서버' },
+  { label: '로컬 Ollama', baseUrl: 'http://localhost:11434/v1', model: '', hint: 'Ollama OpenAI 호환 엔드포인트 (OLLAMA_ORIGINS 설정 필요)' },
+]
+
 export function SettingsPage() {
   const settings = useSettings()
   const [llm, setLlm] = useState<LlmSettings>(DEFAULT_LLM_SETTINGS)
@@ -84,6 +90,19 @@ export function SettingsPage() {
                   <ToggleGroupItem value="live">Live (실제 endpoint)</ToggleGroupItem>
                 </ToggleGroup>
               </div>
+              {llm.mode === 'live' && (
+                <div className="grid gap-1.5">
+                  <Label>사내 API 프리셋</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRESETS.map((p) => (
+                      <Button key={p.label} type="button" variant="outline" size="sm" onClick={() => setLlm({ ...llm, baseUrl: p.baseUrl, model: p.model || llm.model })} title={p.hint}>
+                        {p.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">프리셋은 URL 형식만 채워 줍니다. 실제 호스트와 API 키는 사내 값으로 바꿔 주세요.</p>
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="grid gap-1.5 md:col-span-2">
                   <Label htmlFor="base">Base URL</Label>

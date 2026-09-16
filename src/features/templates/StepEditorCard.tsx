@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Bot, GripVertical, Hand, Plus, Trash2, X } from 'lucide-react'
+import { BookmarkPlus, Bot, GripVertical, Hand, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,6 +18,7 @@ interface StepEditorCardProps {
   index: number
   onChange: (next: StepTemplate) => void
   onRemove: () => void
+  onSaveToLibrary?: () => void
 }
 
 const listToText = (l: string[]) => l.join(', ')
@@ -27,7 +28,7 @@ const textToList = (t: string) =>
     .map((s) => s.trim())
     .filter(Boolean)
 
-export function StepEditorCard({ step, index, onChange, onRemove }: StepEditorCardProps) {
+export function StepEditorCard({ step, index, onChange, onRemove, onSaveToLibrary }: StepEditorCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: step.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const manual = step.mode === 'manual'
@@ -39,7 +40,7 @@ export function StepEditorCard({ step, index, onChange, onRemove }: StepEditorCa
       mode,
       assistant:
         mode === 'assistant'
-          ? (step.assistant ?? { modelId: `et-${step.key.toLowerCase()}-assistant`, displayName: `${step.name} Assistant`, systemPromptHint: '' })
+          ? (step.assistant ?? { modelId: '', displayName: `${step.name} Assistant`, systemPromptHint: '' })
           : undefined,
     })
   }
@@ -53,7 +54,7 @@ export function StepEditorCard({ step, index, onChange, onRemove }: StepEditorCa
         <span className="flex size-6 items-center justify-center rounded-full text-xs font-semibold text-white" style={{ backgroundColor: manual ? '#9ca3af' : step.color }}>
           {index + 1}
         </span>
-        <Input value={step.name} onChange={(e) => onChange({ ...step, name: e.target.value })} className="h-7 max-w-xs text-sm font-medium" placeholder="단계 이름" />
+        <Input value={step.name} onChange={(e) => onChange({ ...step, name: e.target.value })} className="h-7 max-w-xs text-sm font-medium" placeholder="Task 이름" />
         <Select value={step.key} onValueChange={(v) => onChange({ ...step, key: v as StepKey, color: STEP_COLORS[v as StepKey] })}>
           <SelectTrigger size="sm" className="w-36">
             <SelectValue />
@@ -71,7 +72,12 @@ export function StepEditorCard({ step, index, onChange, onRemove }: StepEditorCa
           {manual ? '수동' : 'assistant'}
           <Switch checked={!manual} onCheckedChange={(v) => setMode(!v)} />
         </label>
-        <Button variant="ghost" size="icon-xs" aria-label="단계 삭제" className="hover:text-destructive" onClick={onRemove}>
+        {onSaveToLibrary && (
+          <Button variant="ghost" size="icon-xs" aria-label="라이브러리에 저장" title="Task 모듈 라이브러리에 저장" onClick={onSaveToLibrary}>
+            <BookmarkPlus />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon-xs" aria-label="Task 삭제" className="hover:text-destructive" onClick={onRemove}>
           <Trash2 />
         </Button>
       </div>
@@ -82,9 +88,9 @@ export function StepEditorCard({ step, index, onChange, onRemove }: StepEditorCa
         </div>
         {!manual && step.assistant && (
           <div className="grid gap-1">
-            <Label className="text-[11px]">assistant (OpenWebUI 모델 ID / 표시 이름)</Label>
+            <Label className="text-[11px]">assistant 모델 ID (비우면 업무/템플릿/설정 기본값) / 표시 이름</Label>
             <div className="flex gap-1.5">
-              <Input value={step.assistant.modelId} onChange={(e) => onChange({ ...step, assistant: { ...step.assistant!, modelId: e.target.value } })} className="h-7 font-mono text-xs" placeholder="et-urs-assistant" />
+              <Input value={step.assistant.modelId} onChange={(e) => onChange({ ...step, assistant: { ...step.assistant!, modelId: e.target.value } })} className="h-7 font-mono text-xs" placeholder="기본 모델 사용" />
               <Input value={step.assistant.displayName} onChange={(e) => onChange({ ...step, assistant: { ...step.assistant!, displayName: e.target.value } })} className="h-7 text-xs" placeholder="URS Assistant" />
             </div>
             <Input

@@ -17,7 +17,10 @@ import type {
 export interface NewTaskInput {
   title: string
   summary: string
-  templateId: ID
+  /** 템플릿 기반 생성. 없으면 modules 또는 수동 업무 */
+  templateId?: ID
+  /** 직접 구성: 이 Task 모듈 정의들로 구성 (빈 배열 = 수동 업무) */
+  modules?: StepTemplate[]
   ownerId: ID
   assigneeIds: ID[]
   priority: Priority
@@ -65,33 +68,38 @@ async function nextTaskCode(): Promise<string> {
   return `ET-${year}-${String(max + 1).padStart(4, '0')}`
 }
 
+/**
+ * 업무 생성. 템플릿 / 모듈 직접 구성 / 수동(Task 없음) 세 가지 방식을 지원한다.
+ * 모듈이 하나도 없으면 currentStepId가 빈 문자열인 수동 업무가 된다.
+ */
 export async function createTaskFromTemplate(actor: Actor, input: NewTaskInput): Promise<Task> {
-  const template = await db.templates.get(input.templateId)
-  if (!template) throw new Error('템플릿을 찾을 수 없습니다.')
+  const template = input.templateId ? await db.templates.get(input.templateId) : undefined
+  if (input.templateId && !template) throw new Error('템플릿을 찾을 수 없습니다.')
   const taskId = newId('task')
-  const steps = template.steps.map((s, i) => instantiateStep(taskId, s, i))
+  const defs = template ? template.steps : (input.modules ?? [])
+  const steps = defs.map((s, i) => instantiateStep(taskId, s, i))
   const task: Task = {
     id: taskId,
     code: await nextTaskCode(),
     title: input.title,
     summary: input.summary,
-    templateId: template.id,
+    templateId: template?.id ?? '',
     status: 'active',
-    currentStepId: steps[0].id,
+    currentStepId: steps[0]?.id ?? '',
     ownerId: input.ownerId,
     assigneeIds: input.assigneeIds,
     priority: input.priority,
     dueDate: input.dueDate,
     externalRef: input.externalRef,
     tags: input.tags ?? [],
-    defaultModelId: input.defaultModelId ?? template.defaultModelId,
+    defaultModelId: input.defaultModelId ?? template?.defaultModelId,
     createdAt: nowIso(),
     createdBy: actor.userId,
   }
   await db.transaction('rw', db.tasks, db.steps, db.activity, async () => {
     await db.tasks.add(task)
     await db.steps.bulkAdd(steps)
-    await logActivity(actor, taskId, 'task.created', { templateName: template.name })
+    await logActivity(actor, taskId, 'task.created', { templateName: template?.name ?? (steps.length ? '직접 구성' : '수동 업무') })
   })
   return task
 }
@@ -254,13 +262,51 @@ export async function setTaskStatus(actor: Actor, taskId: ID, status: TaskStatus
 
 /** 템플릿의 단계를 진행 중 업무에 추가 (현재 단계 뒤에 삽입) */
 export async function insertStepAfter(actor: Actor, taskId: ID, afterStepId: ID, tpl: StepTemplate): Promise<void> {
-  await db.transaction('rw', db.steps, db.activity, async () => {
+  await db.transaction('rw', db.tasks, db.steps, db.activity, async () => {
     const steps = await db.steps.where('taskId').equals(taskId).sortBy('order')
     const idx = steps.findIndex((s) => s.id === afterStepId)
     const inserted = { ...instantiateStep(taskId, tpl, idx + 1), status: 'pending' as const, startedAt: undefined }
     const reordered = [...steps.slice(0, idx + 1), inserted, ...steps.slice(idx + 1)].map((s, i) => ({ ...s, order: i }))
     await db.steps.bulkPut(reordered)
+    // 수동 업무에 첫 Task를 추가하면 그 Task가 현재 Task가 된다
+    const task = await db.tasks.get(taskId)
+    if (task && !task.currentStepId) {
+      await db.steps.put({ ...inserted, status: 'in_progress', startedAt: nowIso() })
+      await db.tasks.update(taskId, { currentStepId: inserted.id })
+    }
     await logActivity(actor, taskId, 'step.started', { stepName: inserted.name, inserted: true }, inserted.id)
+  })
+}
+
+/** Task 제거. 대기 상태이고 대화가 없는 Task만 제거할 수 있다. */
+export async function removeStep(actor: Actor, stepId: ID): Promise<{ ok: boolean; reason?: string }> {
+  return db.transaction('rw', db.tasks, db.steps, db.threads, db.activity, async () => {
+    const step = await db.steps.get(stepId)
+    if (!step) return { ok: false, reason: 'Task를 찾을 수 없습니다.' }
+    if (step.status !== 'pending') return { ok: false, reason: '대기 상태의 Task만 제거할 수 있습니다. 진행/완료된 Task는 건너뛰기를 사용하세요.' }
+    const threads = await db.threads.where('stepInstanceId').equals(stepId).count()
+    if (threads > 0) return { ok: false, reason: '대화 이력이 있는 Task는 제거할 수 없습니다.' }
+    await db.steps.delete(stepId)
+    const rest = (await db.steps.where('taskId').equals(step.taskId).sortBy('order')).map((s, i) => ({ ...s, order: i }))
+    await db.steps.bulkPut(rest)
+    await logActivity(actor, step.taskId, 'step.removed', { stepName: step.name })
+    return { ok: true }
+  })
+}
+
+/** Task 순서 변경 (위/아래 한 칸) */
+export async function moveStep(actor: Actor, stepId: ID, direction: -1 | 1): Promise<void> {
+  await db.transaction('rw', db.steps, db.activity, async () => {
+    const step = await db.steps.get(stepId)
+    if (!step) return
+    const steps = await db.steps.where('taskId').equals(step.taskId).sortBy('order')
+    const idx = steps.findIndex((s) => s.id === stepId)
+    const target = idx + direction
+    if (target < 0 || target >= steps.length) return
+    const swapped = [...steps]
+    ;[swapped[idx], swapped[target]] = [swapped[target], swapped[idx]]
+    await db.steps.bulkPut(swapped.map((s, i) => ({ ...s, order: i })))
+    await logActivity(actor, step.taskId, 'step.reordered', { stepName: step.name, direction }, stepId)
   })
 }
 

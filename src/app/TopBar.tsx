@@ -11,7 +11,7 @@ import {
 import { UserAvatar } from '@/components/UserAvatar'
 import { useCurrentUser, useSettings, useUsers } from './hooks'
 import { useUiStore } from './uiStore'
-import { setCurrentUser } from '@/db/repositories/settings'
+import { setTabUser } from './tabUser'
 import { toast } from 'sonner'
 
 interface TopBarProps {
@@ -46,14 +46,14 @@ export function TopBar({ title, actions }: TopBarProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="text-xs text-muted-foreground">사용자 전환 (데모)</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-xs text-muted-foreground">사용자 전환 — 이 탭에만 적용 (탭마다 다른 사용자로 같은 대화에 참여 가능)</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {users.map((u) => (
             <DropdownMenuItem
               key={u.id}
-              onClick={async () => {
-                await setCurrentUser(u.id)
-                toast.success(`${u.name} 님으로 전환했습니다.`)
+              onClick={() => {
+                setTabUser(u.id)
+                toast.success(`이 탭을 ${u.name} 님으로 전환했습니다.`)
               }}
             >
               <UserAvatar user={u} size="sm" />

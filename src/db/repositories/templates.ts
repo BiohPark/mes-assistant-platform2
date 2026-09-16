@@ -23,7 +23,7 @@ export function newStepTemplate(key: StepKey, name: string, partial: Partial<Ste
     mode,
     assistant:
       mode === 'assistant'
-        ? { modelId: `et-${key.toLowerCase()}-assistant`, displayName: `${name} Assistant`, systemPromptHint: '' }
+        ? { modelId: '', displayName: `${name} Assistant`, systemPromptHint: '' }
         : undefined,
     inputSpec: [],
     outputSpec: [],

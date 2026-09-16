@@ -12,9 +12,10 @@ interface ComposerProps {
   onStop: () => void
   suggestions?: string[]
   allowAttachments?: boolean
+  onTyping?: () => void
 }
 
-export function Composer({ disabled, streaming, placeholder, onSend, onStop, suggestions, allowAttachments = true }: ComposerProps) {
+export function Composer({ disabled, streaming, placeholder, onSend, onStop, suggestions, allowAttachments = true, onTyping }: ComposerProps) {
   const [text, setText] = useState('')
   const [pending, setPending] = useState<File[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -74,7 +75,10 @@ export function Composer({ disabled, streaming, placeholder, onSend, onStop, sug
         <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => setPending((p) => [...p, ...Array.from(e.target.files ?? [])])} />
         <Textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value)
+            if (e.target.value) onTyping?.()
+          }}
           placeholder={placeholder ?? 'assistant에게 요청하세요. Enter 전송, Shift+Enter 줄바꿈'}
           rows={1}
           disabled={disabled}

@@ -52,8 +52,8 @@ export function CompleteStepDialog({ open, onOpenChange, step, files, nextStep, 
         await giveStepFeedback(actor, step.id, rating, comment.trim())
       }
       await runStepAction(actor, step.id, 'complete', { missingRequired: missing.length })
-      toast.success(`"${step.name}" 단계를 완료했습니다.`, {
-        description: nextStep ? `다음 단계: ${nextStep.name}` : '마지막 단계입니다. 업무를 완료할 수 있습니다.',
+      toast.success(`"${step.name}" Task를 완료했습니다.`, {
+        description: nextStep ? `다음 Task: ${nextStep.name}` : '마지막 Task입니다. 업무를 완료할 수 있습니다.',
       })
       onOpenChange(false)
       onCompleted?.(nextStep?.id)
@@ -66,8 +66,8 @@ export function CompleteStepDialog({ open, onOpenChange, step, files, nextStep, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>단계 완료 — {step.name}</DialogTitle>
-          <DialogDescription>완료 전 체크리스트와 산출물을 확인하세요. 산출물은 다음 단계의 입력 후보가 됩니다.</DialogDescription>
+          <DialogTitle>Task 완료 — {step.name}</DialogTitle>
+          <DialogDescription>완료 전 체크리스트와 산출물을 확인하세요. 산출물은 다음 Task의 입력 후보가 됩니다.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {missing.length > 0 ? (

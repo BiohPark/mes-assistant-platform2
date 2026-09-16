@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type {
   ActivityLog,
+  TaskModule,
   FileAsset,
   Message,
   Note,
@@ -15,6 +16,7 @@ import type {
 export class AppDB extends Dexie {
   users!: EntityTable<User, 'id'>
   templates!: EntityTable<WorkflowTemplate, 'id'>
+  modules!: EntityTable<TaskModule, 'id'>
   tasks!: EntityTable<Task, 'id'>
   steps!: EntityTable<StepInstance, 'id'>
   threads!: EntityTable<Thread, 'id'>
@@ -38,6 +40,9 @@ export class AppDB extends Dexie {
       activity: 'id, taskId, stepInstanceId, userId, at, type',
       settings: 'id',
     })
+    this.version(2).stores({
+      modules: 'id, key',
+    })
   }
 }
 
@@ -46,6 +51,7 @@ export const db = new AppDB()
 export const TABLE_NAMES = [
   'users',
   'templates',
+  'modules',
   'tasks',
   'steps',
   'threads',

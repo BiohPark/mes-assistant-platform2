@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { toast } from 'sonner'
-import { ArrowLeft, Bot, Plus, Save } from 'lucide-react'
+import { ArrowLeft, Bot, Library, Plus, Save } from 'lucide-react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { TopBar } from '@/app/TopBar'
@@ -15,12 +15,20 @@ import { db } from '@/db/schema'
 import { newStepTemplate, saveTemplate } from '@/db/repositories/templates'
 import type { StepTemplate, WorkflowTemplate } from '@/domain/types'
 import { StepEditorCard } from './StepEditorCard'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ModuleLibraryPicker, useModules } from '@/features/modules/ModuleLibraryPicker'
+import { moduleFromStepTemplate, saveModule, stepTemplateFromModule } from '@/db/repositories/modules'
+import { useActor } from '@/app/hooks'
 
 export function TemplateEditorPage() {
   const { templateId } = useParams()
   const saved = useLiveQuery(() => (templateId ? db.templates.get(templateId) : undefined), [templateId])
   const [draft, setDraft] = useState<WorkflowTemplate | null>(null)
   const setAssistantOpen = useUiStore((s) => s.setAssistantOpen)
+  const actor = useActor()
+  const modules = useModules()
+  const [libOpen, setLibOpen] = useState(false)
+  const [picked, setPicked] = useState<string[]>([])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   useEffect(() => {
@@ -41,6 +49,18 @@ export function TemplateEditorPage() {
       const to = d.steps.findIndex((s) => s.id === over.id)
       return { ...d, steps: arrayMove(d.steps, from, to) }
     })
+  }
+  function addFromLibrary() {
+    if (!draft) return
+    const defs = picked.map((id) => modules.find((m) => m.id === id)).filter((m) => m !== undefined).map(stepTemplateFromModule)
+    setDraft({ ...draft, steps: [...draft.steps, ...defs] })
+    setPicked([])
+    setLibOpen(false)
+  }
+  async function saveToLibrary(step: StepTemplate) {
+    if (!actor || !draft) return
+    await saveModule(moduleFromStepTemplate(actor, step, [draft.category]))
+    toast.success(`"${step.name}"을(를) 모듈 라이브러리에 저장했습니다.`)
   }
   async function save() {
     if (!draft) return
@@ -124,15 +144,19 @@ export function TemplateEditorPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">단계 {draft.steps.length}개</h2>
+            <h2 className="text-sm font-semibold">Task {draft.steps.length}개</h2>
             <div className="flex gap-1.5">
               <Button variant="outline" size="sm" onClick={() => setAssistantOpen(true)}>
                 <Bot data-icon="inline-start" />
-                assistant로 단계 구성
+                assistant로 구성
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>
+                <Library data-icon="inline-start" />
+                라이브러리에서 추가
               </Button>
               <Button size="sm" onClick={() => setDraft({ ...draft, steps: [...draft.steps, newStepTemplate('CUSTOM', `새 단계 ${draft.steps.length + 1}`)] })}>
                 <Plus data-icon="inline-start" />
-                단계 추가
+                Task 추가
               </Button>
             </div>
           </div>
@@ -147,6 +171,7 @@ export function TemplateEditorPage() {
                     index={i}
                     onChange={(next) => updateStep(s.id, next)}
                     onRemove={() => setDraft({ ...draft, steps: draft.steps.filter((x) => x.id !== s.id) })}
+                    onSaveToLibrary={() => saveToLibrary(s)}
                   />
                 ))}
               </div>
@@ -154,14 +179,31 @@ export function TemplateEditorPage() {
           </DndContext>
           {draft.steps.length === 0 && (
             <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-              단계가 없습니다. "단계 추가" 또는 시스템 assistant로 구성하세요.
+              Task가 없습니다. "Task 추가", "라이브러리에서 추가" 또는 시스템 assistant로 구성하세요.
             </div>
           )}
           <p className="text-[11px] text-muted-foreground">
-            변경 사항은 이후 생성되는 업무에만 적용됩니다. 진행 중인 업무는 업무 화면의 "단계 추가"로 개별 조정할 수 있습니다.
+            변경 사항은 이후 생성되는 업무에만 적용됩니다. 진행 중인 업무는 업무 화면의 "워크플로우 구성"에서 Task를 갈아끼울 수 있습니다.
           </p>
         </div>
       </div>
+      <Dialog open={libOpen} onOpenChange={setLibOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>모듈 라이브러리에서 추가</DialogTitle>
+            <DialogDescription>선택한 순서대로 템플릿 끝에 추가됩니다. 추가 후 세부 조정할 수 있습니다.</DialogDescription>
+          </DialogHeader>
+          <ModuleLibraryPicker selected={picked} onChange={setPicked} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLibOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={addFromLibrary} disabled={picked.length === 0}>
+              {picked.length ? `${picked.length}개 추가` : '추가'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

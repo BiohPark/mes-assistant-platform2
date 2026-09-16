@@ -2,6 +2,7 @@ import { db, type AppDB } from '../schema'
 import { clearAll } from '../exportImport'
 import { SEED_USERS } from './users'
 import { SEED_TEMPLATES } from './templates'
+import { SEED_MODULES } from './modules'
 import { buildSeedTasks } from './tasks'
 import { DEFAULT_LLM_SETTINGS } from '@/domain/types'
 import { DEFAULT_USER_ID } from '../repositories/settings'
@@ -11,6 +12,7 @@ export async function seedDatabase(database: AppDB = db, now = new Date()): Prom
   const tables = [
     database.users,
     database.templates,
+    database.modules,
     database.tasks,
     database.steps,
     database.threads,
@@ -23,6 +25,7 @@ export async function seedDatabase(database: AppDB = db, now = new Date()): Prom
   await database.transaction('rw', tables, async () => {
     await database.users.bulkPut(SEED_USERS)
     await database.templates.bulkPut(SEED_TEMPLATES)
+    await database.modules.bulkPut(SEED_MODULES)
     await database.tasks.bulkPut(bundle.tasks)
     await database.steps.bulkPut(bundle.steps)
     await database.threads.bulkPut(bundle.threads)
@@ -42,5 +45,10 @@ export async function resetToSeed(database: AppDB = db): Promise<void> {
 /** 최초 실행 시 비어 있으면 시드 주입 */
 export async function ensureSeeded(database: AppDB = db): Promise<void> {
   const count = await database.users.count()
-  if (count === 0) await seedDatabase(database)
+  if (count === 0) {
+    await seedDatabase(database)
+    return
+  }
+  // 기존 DB(v1)에는 모듈 라이브러리가 없으므로 채워 넣는다
+  if ((await database.modules.count()) === 0) await database.modules.bulkPut(SEED_MODULES)
 }

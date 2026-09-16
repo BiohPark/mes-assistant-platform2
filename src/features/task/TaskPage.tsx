@@ -8,6 +8,7 @@ import { useTaskData } from './useTaskData'
 import { TaskHeader } from './TaskHeader'
 import { WorkflowStepper } from './WorkflowStepper'
 import { StepPanel } from './StepPanel'
+import { ManualTaskPanel } from './ManualTaskPanel'
 
 export function TaskPage() {
   const { taskId, stepId } = useParams()
@@ -16,7 +17,7 @@ export function TaskPage() {
 
   // 단계 파라미터가 없으면 현재 단계로 URL 정규화 (딥링크 일관성)
   useEffect(() => {
-    if (data && !stepId) navigate(`/tasks/${data.task.id}/steps/${data.task.currentStepId}`, { replace: true })
+    if (data && !stepId && data.task.currentStepId) navigate(`/tasks/${data.task.id}/steps/${data.task.currentStepId}`, { replace: true })
   }, [data, stepId, navigate])
 
   if (data === undefined) {
@@ -47,7 +48,7 @@ export function TaskPage() {
     )
   }
 
-  const selected = data.steps.find((s) => s.id === stepId) ?? data.steps.find((s) => s.id === data.task.currentStepId) ?? data.steps[0]
+  const selected = data.steps.find((s) => s.id === stepId) ?? data.steps.find((s) => s.id === data.task.currentStepId) ?? data.steps.at(0)
 
   return (
     <>
@@ -65,16 +66,22 @@ export function TaskPage() {
         }
       />
       <div className="flex min-h-0 flex-1 flex-col">
-        <TaskHeader data={data} selectedStepId={selected.id} />
-        <div className="border-b bg-muted/30 px-3">
-          <WorkflowStepper
-            steps={data.steps}
-            currentStepId={data.task.currentStepId}
-            selectedStepId={selected.id}
-            onSelect={(id) => navigate(`/tasks/${data.task.id}/steps/${id}`)}
-          />
-        </div>
-        <StepPanel key={selected.id} data={data} step={selected} />
+        <TaskHeader data={data} selectedStepId={selected?.id ?? ''} />
+        {selected ? (
+          <>
+            <div className="border-b bg-muted/30 px-3">
+              <WorkflowStepper
+                steps={data.steps}
+                currentStepId={data.task.currentStepId}
+                selectedStepId={selected.id}
+                onSelect={(id) => navigate(`/tasks/${data.task.id}/steps/${id}`)}
+              />
+            </div>
+            <StepPanel key={selected.id} data={data} step={selected} />
+          </>
+        ) : (
+          <ManualTaskPanel data={data} />
+        )}
       </div>
     </>
   )
