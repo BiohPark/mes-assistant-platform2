@@ -142,6 +142,9 @@ export class SeedBuilder {
         this.log(s.completedBy ?? spec.ownerId, taskId, 'step.completed', { stepName: s.name }, s.id, s.completedAt)
       if (s.status === 'skipped' && s.completedAt)
         this.log(s.completedBy ?? spec.ownerId, taskId, 'step.skipped', { stepName: s.name }, s.id, s.completedAt)
+      s.checklist
+        .filter((c) => c.checked && c.checkedBy && c.checkedAt)
+        .forEach((c) => this.log(c.checkedBy!, taskId, 'checklist.checked', { label: c.label }, s.id, c.checkedAt!))
     })
     if (task.status === 'done' && task.completedAt) this.log(spec.ownerId, taskId, 'task.completed', {}, undefined, task.completedAt)
     return { task, steps }
