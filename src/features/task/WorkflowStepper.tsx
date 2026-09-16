@@ -27,7 +27,7 @@ export function WorkflowStepper({ steps, currentStepId, selectedStepId, onSelect
         const progress = checklistProgress(s)
         const prevDone = i > 0 && (steps[i - 1].status === 'done' || steps[i - 1].status === 'skipped')
         return (
-          <div key={s.id} className="flex min-w-0 flex-1 items-center">
+          <div key={s.id} className="flex min-w-[176px] flex-1 shrink-0 items-center">
             {i > 0 && (
               <div className={cn('h-0.5 w-4 shrink-0 md:w-6', prevDone ? 'bg-foreground/40' : 'bg-border')} />
             )}

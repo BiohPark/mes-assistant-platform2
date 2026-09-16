@@ -28,6 +28,10 @@ export class MockProvider implements ChatProvider {
     return { ok: true, detail: 'Mock 모드 — 네트워크 호출 없음' }
   }
 
+  async listModels(): Promise<string[]> {
+    return ['glm-5.2', 'et-urs-assistant', 'et-fds-assistant', 'et-test-assistant', 'et-protocol-assistant', 'et-deploy-assistant']
+  }
+
   async *stream(req: ChatRequest): AsyncIterable<ChatChunk> {
     const userText = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? ''
     const turn = req.messages.filter((m) => m.role === 'assistant').length

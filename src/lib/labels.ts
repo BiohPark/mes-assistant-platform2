@@ -37,6 +37,7 @@ export const ACTIVITY_LABEL: Record<ActivityType, string> = {
   'step.skipped': '단계 건너뜀',
   'step.reopened': '단계 되돌림',
   'step.mode_changed': '진행 방식 변경',
+  'step.model_changed': 'assistant 모델 변경',
   'step.navigated': '단계 이동',
   'checklist.checked': '체크리스트 완료',
   'checklist.unchecked': '체크리스트 해제',

@@ -13,6 +13,8 @@ import { resetToSeed } from '@/db/seed'
 import { createProvider } from '@/llm'
 import { DEFAULT_LLM_SETTINGS, type LlmMode, type LlmSettings } from '@/domain/types'
 import { downloadBlob } from '@/db/repositories/files'
+import { useModelList } from '@/llm/useModelList'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function SettingsPage() {
   const settings = useSettings()
@@ -20,6 +22,7 @@ export function SettingsPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; detail: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const modelList = useModelList(llm, false)
 
   useEffect(() => {
     if (settings) setLlm(settings.llm)
@@ -95,8 +98,30 @@ export function SettingsPage() {
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="model">기본 모델</Label>
-                  <Input id="model" value={llm.model} onChange={(e) => setLlm({ ...llm, model: e.target.value })} placeholder="glm-5.2" disabled={llm.mode === 'mock'} />
-                  <p className="text-[11px] text-muted-foreground">단계별 assistant는 템플릿의 모델 ID를 우선 사용합니다.</p>
+                  <div className="flex gap-1.5">
+                    <Input id="model" value={llm.model} onChange={(e) => setLlm({ ...llm, model: e.target.value })} placeholder="glm-5.2" className="font-mono" />
+                    <Button type="button" variant="outline" size="sm" onClick={() => void modelList.reload()} disabled={modelList.loading}>
+                      <RefreshCw data-icon="inline-start" className={modelList.loading ? 'animate-spin' : ''} />
+                      목록
+                    </Button>
+                  </div>
+                  {modelList.models.length > 0 && (
+                    <Select value={modelList.models.includes(llm.model) ? llm.model : ''} onValueChange={(v) => setLlm({ ...llm, model: v })}>
+                      <SelectTrigger size="sm" className="w-full font-mono">
+                        <SelectValue placeholder={`서버 모델 ${modelList.models.length}개 중 선택`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modelList.models.map((m) => (
+                          <SelectItem key={m} value={m} className="font-mono">
+                            {m}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    단계에 모델이 지정되어 있으면(템플릿 또는 채팅 헤더의 모델 선택) 그 모델을 우선 사용하고, 없으면 이 기본 모델을 씁니다. Mock 모드에서는 모델과 무관하게 시나리오 응답이 나옵니다.
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

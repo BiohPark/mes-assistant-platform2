@@ -67,7 +67,7 @@ export function useChat(actor: Actor | undefined, task: Task, step: StepInstance
 
       try {
         for await (const chunk of provider.stream({
-          model: step.assistant?.modelId ?? settings.llm.model,
+          model: step.assistant?.modelId || settings.llm.model,
           messages: toChatMessages(systemPrompt, history),
           signal: controller.signal,
           meta: stepMeta(task, step, inputFiles),

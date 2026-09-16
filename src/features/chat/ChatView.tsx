@@ -11,6 +11,7 @@ import { useChat } from './useChat'
 import { MessageBubble } from './MessageBubble'
 import { Composer } from './Composer'
 import { SaveAsOutputDialog } from './SaveAsOutputDialog'
+import { ModelPicker } from './ModelPicker'
 
 interface ChatViewProps {
   task: Task
@@ -49,11 +50,12 @@ export function ChatView({ task, step, files, readOnly }: ChatViewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-1 border-b bg-muted/30 px-2 py-1">
-        <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-violet-700">
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-700">
           <Bot className="size-3.5" />
           {step.assistant?.displayName ?? 'Assistant'}
-          <span className="font-mono text-[10px] text-muted-foreground">({step.assistant?.modelId})</span>
         </span>
+        <ModelPicker step={step} disabled={readOnly} />
+        <span className="mx-1 h-4 w-px bg-border" />
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
           {chat.threads.map((t) => (
             <button

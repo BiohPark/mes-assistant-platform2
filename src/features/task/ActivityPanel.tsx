@@ -34,6 +34,8 @@ function describe(a: ActivityLog): string {
       return String(p.preview ?? '')
     case 'step.mode_changed':
       return p.mode === 'manual' ? '수동 진행으로 전환' : 'assistant 진행으로 전환'
+    case 'step.model_changed':
+      return String(p.modelId ?? '')
     case 'step.reopened':
       return p.reason ? `사유: ${String(p.reason)}` : ''
     case 'file.selected_input':

@@ -162,6 +162,21 @@ export async function setStepMode(actor: Actor, stepId: ID, mode: StepMode): Pro
   })
 }
 
+/** 단계 assistant 모델 변경. 빈 문자열이면 설정의 기본 모델을 사용한다. */
+export async function setStepModel(actor: Actor, stepId: ID, modelId: string): Promise<void> {
+  await db.transaction('rw', db.steps, db.activity, async () => {
+    const step = await db.steps.get(stepId)
+    if (!step) return
+    const assistant = {
+      modelId,
+      displayName: step.assistant?.displayName ?? `${step.name} Assistant`,
+      systemPromptHint: step.assistant?.systemPromptHint ?? '',
+    }
+    await db.steps.put({ ...step, assistant })
+    await logActivity(actor, step.taskId, 'step.model_changed', { stepName: step.name, modelId: modelId || '(기본)' }, stepId)
+  })
+}
+
 export async function toggleChecklist(actor: Actor, stepId: ID, itemId: ID): Promise<void> {
   await db.transaction('rw', db.steps, db.activity, async () => {
     const step = await db.steps.get(stepId)

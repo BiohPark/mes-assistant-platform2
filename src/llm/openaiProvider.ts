@@ -40,6 +40,17 @@ export class OpenAICompatibleProvider implements ChatProvider {
     }
   }
 
+  async listModels(): Promise<string[]> {
+    try {
+      const res = await fetch(joinUrl(this.settings.baseUrl, 'models'), { headers: this.headers() })
+      if (!res.ok) return []
+      const body = (await res.json()) as { data?: Array<{ id: string }> }
+      return (body.data ?? []).map((m) => m.id)
+    } catch {
+      return []
+    }
+  }
+
   async *stream(req: ChatRequest): AsyncIterable<ChatChunk> {
     let res: Response
     try {

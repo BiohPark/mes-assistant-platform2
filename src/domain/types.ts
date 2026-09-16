@@ -194,6 +194,7 @@ export type ActivityType =
   | 'step.skipped'
   | 'step.reopened'
   | 'step.mode_changed'
+  | 'step.model_changed'
   | 'step.navigated'
   | 'checklist.checked'
   | 'checklist.unchecked'
