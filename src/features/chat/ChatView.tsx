@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Bot, MessageSquarePlus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useActor } from '@/app/hooks'
+import { useActor, useUserMap } from '@/app/hooks'
+import { AvatarGroup } from '@/components/UserAvatar'
+import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { deleteThread, setActiveThread } from '@/db/repositories/chat'
 import { uploadFile } from '@/db/repositories/files'
-import type { FileAsset, Message, StepInstance, Task } from '@/domain/types'
+import type { FileAsset, Message, StepInstance, Task, WorkflowTemplate } from '@/domain/types'
 import { cn } from '@/lib/utils'
 import { useChat } from './useChat'
 import { MessageBubble } from './MessageBubble'
@@ -17,6 +19,7 @@ interface ChatViewProps {
   task: Task
   step: StepInstance
   files: FileAsset[]
+  template?: WorkflowTemplate
   readOnly?: boolean
 }
 
@@ -28,9 +31,11 @@ const SUGGESTIONS: Record<string, string[]> = {
   DEPLOY: ['배포 검증 SQL 만들어줘', '조회 결과 대조해서 결과서 작성해줘'],
 }
 
-export function ChatView({ task, step, files, readOnly }: ChatViewProps) {
+export function ChatView({ task, step, files, template, readOnly }: ChatViewProps) {
   const actor = useActor()
-  const chat = useChat(actor, task, step, files)
+  const users = useUserMap()
+  const chat = useChat(actor, task, step, files, template)
+  const participantIds = Array.from(new Set(chat.messages.filter((m) => m.role === 'user' && m.authorId).map((m) => m.authorId!)))
   const [saveTarget, setSaveTarget] = useState<Message | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileMap = new Map(files.map((f) => [f.id, f]))
@@ -54,7 +59,21 @@ export function ChatView({ task, step, files, readOnly }: ChatViewProps) {
           <Bot className="size-3.5" />
           {step.assistant?.displayName ?? 'Assistant'}
         </span>
-        <ModelPicker step={step} disabled={readOnly} />
+        <ModelPicker task={task} step={step} thread={chat.activeThread} template={template} disabled={readOnly} />
+        {participantIds.length > 0 && (
+          <Tip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center gap-1 rounded-md px-1 text-[10px] text-muted-foreground">
+                <AvatarGroup users={participantIds.map((id) => users.get(id))} max={4} />
+                {participantIds.length >= 2 && <span>{participantIds.length}명 참여</span>}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              참여자: {participantIds.map((id) => users.get(id)?.name ?? id).join(', ')}
+              {participantIds.length >= 2 && ' — assistant에게는 발화자 이름이 함께 전달됩니다'}
+            </TooltipContent>
+          </Tip>
+        )}
         <span className="mx-1 h-4 w-px bg-border" />
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
           {chat.threads.map((t) => (

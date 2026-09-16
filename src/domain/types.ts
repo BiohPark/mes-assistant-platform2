@@ -57,6 +57,8 @@ export interface WorkflowTemplate {
   name: string
   description: string
   category: string
+  /** 템플릿 기본 assistant 모델. 단계에 지정이 없을 때 사용 */
+  defaultModelId?: string
   steps: StepTemplate[]
   createdBy: ID
   updatedAt: ISODate
@@ -85,6 +87,8 @@ export interface Task {
   dueDate?: ISODate
   externalRef?: ExternalRef
   tags: string[]
+  /** 업무 기본 assistant 모델 (템플릿 기본값에서 복사, 업무별 변경 가능) */
+  defaultModelId?: string
   createdAt: ISODate
   createdBy: ID
   completedAt?: ISODate
@@ -140,6 +144,8 @@ export interface Thread {
   createdAt: ISODate
   createdBy: ID
   archived: boolean
+  /** 이 대화에서만 쓰는 모델 (단계/업무 기본값보다 우선) */
+  modelId?: string
 }
 
 export type MessageRole = 'system' | 'user' | 'assistant'
@@ -194,7 +200,7 @@ export type ActivityType =
   | 'step.skipped'
   | 'step.reopened'
   | 'step.mode_changed'
-  | 'step.model_changed'
+  | 'model.changed'
   | 'step.navigated'
   | 'checklist.checked'
   | 'checklist.unchecked'

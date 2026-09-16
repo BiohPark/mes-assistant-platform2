@@ -150,7 +150,7 @@ export function StepPanel({ data, step }: StepPanelProps) {
               </div>
             </div>
           ) : (
-            <ChatView task={task} step={step} files={files} readOnly={taskLocked} />
+            <ChatView task={task} step={step} files={files} template={data.template} readOnly={taskLocked} />
           )}
         </div>
 

@@ -129,6 +129,7 @@ export class SeedBuilder {
       dueDate: spec.dueDaysFromNow !== undefined ? this.daysAgo(-spec.dueDaysFromNow) : undefined,
       externalRef: { system: 'ITSM', id: spec.externalId, url: `https://itsm.example.internal/tickets/${spec.externalId}` },
       tags: spec.tags ?? [],
+      defaultModelId: spec.template.defaultModelId,
       createdAt: this.daysAgo(spec.createdDaysAgo),
       createdBy: spec.ownerId,
       completedAt: spec.status === 'done' ? steps.at(-1)?.completedAt : undefined,

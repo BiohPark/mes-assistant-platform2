@@ -11,6 +11,8 @@ import { SYSTEM_ASSISTANT_PROMPT, SYSTEM_TOOLS } from '@/llm/tools'
 import { Composer } from '@/features/chat/Composer'
 import { applyProposal, toProposal, type ProposedAction } from './actions'
 import { cn } from '@/lib/utils'
+import { newId } from '@/lib/ids'
+import { toast } from 'sonner'
 
 interface LocalMessage {
   id: string
@@ -41,8 +43,8 @@ export function SystemAssistantDrawer() {
 
   async function send(text: string) {
     if (!settings || !text.trim()) return
-    const userMsg: LocalMessage = { id: crypto.randomUUID(), role: 'user', content: text.trim() }
-    const botId = crypto.randomUUID()
+    const userMsg: LocalMessage = { id: newId('sm'), role: 'user', content: text.trim() }
+    const botId = newId('sm')
     setMessages((m) => [...m, userMsg, { id: botId, role: 'assistant', content: '', streaming: true }])
     setStreaming(true)
     const controller = new AbortController()
@@ -67,6 +69,9 @@ export function SystemAssistantDrawer() {
           error = chunk.message
         }
       }
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+      toast.error('시스템 assistant 응답 실패', { description: error })
     } finally {
       abortRef.current = null
       setStreaming(false)

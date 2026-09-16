@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Paperclip, Send, Square, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 interface ComposerProps {
   disabled?: boolean
@@ -25,7 +26,14 @@ export function Composer({ disabled, streaming, placeholder, onSend, onStop, sug
     const f = pending
     setText('')
     setPending([])
-    await onSend(t, f)
+    try {
+      await onSend(t, f)
+    } catch (e) {
+      // 전송 실패 시 입력을 복구해 메시지가 사라지지 않게 한다
+      setText(t)
+      setPending(f)
+      toast.error('전송에 실패했습니다.', { description: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   return (

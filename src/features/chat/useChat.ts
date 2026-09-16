@@ -4,9 +4,10 @@ import { db } from '@/db/schema'
 import { appendMessage, createThread, updateMessage } from '@/db/repositories/chat'
 import { getSettings } from '@/db/repositories/settings'
 import { createProvider } from '@/llm'
-import { buildStepSystemPrompt, stepMeta, toChatMessages } from '@/llm/context'
+import { buildStepSystemPrompt, stepMeta, threadParticipants, toChatMessages } from '@/llm/context'
+import { resolveModel } from '@/domain/modelResolution'
 import type { Actor } from '@/db/repositories/activity'
-import type { FileAsset, Message, StepInstance, Task, Thread } from '@/domain/types'
+import type { FileAsset, Message, StepInstance, Task, Thread, WorkflowTemplate } from '@/domain/types'
 
 const FLUSH_INTERVAL_MS = 250
 
@@ -21,7 +22,7 @@ export interface ChatState {
 }
 
 /** 단계별 스레드 대화. 스트리밍 중에는 로컬 상태로 표시하고 주기적으로 DB에 반영한다. */
-export function useChat(actor: Actor | undefined, task: Task, step: StepInstance, files: FileAsset[]): ChatState {
+export function useChat(actor: Actor | undefined, task: Task, step: StepInstance, files: FileAsset[], template?: WorkflowTemplate): ChatState {
   const threads = useLiveQuery(() => db.threads.where('stepInstanceId').equals(step.id).sortBy('createdAt'), [step.id]) ?? []
   const activeThread = threads.find((t) => t.id === step.activeThreadId) ?? threads.at(-1)
   const dbMessages =
@@ -56,8 +57,10 @@ export function useChat(actor: Actor | undefined, task: Task, step: StepInstance
 
       const settings = await getSettings()
       const provider = createProvider(settings.llm)
+      const users = new Map((await db.users.toArray()).map((x) => [x.id, { name: x.name, role: x.role }]))
       const inputFiles = files.filter((f) => step.inputFileIds.includes(f.id) || attachmentIds.includes(f.id))
-      const systemPrompt = await buildStepSystemPrompt(task, step, inputFiles)
+      const systemPrompt = await buildStepSystemPrompt(task, step, inputFiles, threadParticipants(history, users))
+      const { modelId } = resolveModel({ thread, step, task, template, settings: settings.llm })
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -67,8 +70,8 @@ export function useChat(actor: Actor | undefined, task: Task, step: StepInstance
 
       try {
         for await (const chunk of provider.stream({
-          model: step.assistant?.modelId || settings.llm.model,
-          messages: toChatMessages(systemPrompt, history),
+          model: modelId,
+          messages: toChatMessages(systemPrompt, history, users),
           signal: controller.signal,
           meta: stepMeta(task, step, inputFiles),
         })) {
@@ -96,7 +99,7 @@ export function useChat(actor: Actor | undefined, task: Task, step: StepInstance
         setStreamingText('')
       }
     },
-    [actor, activeThread, task, step, files],
+    [actor, activeThread, task, step, files, template],
   )
 
   return { threads, activeThread, messages, streaming: streamingId !== null, send, stop, newThread }

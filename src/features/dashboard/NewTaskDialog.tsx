@@ -32,6 +32,7 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
   const [dueDate, setDueDate] = useState('')
   const [externalId, setExternalId] = useState('')
   const [assignees, setAssignees] = useState<string[]>([])
+  const [modelOverride, setModelOverride] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const tpl = templates.find((t) => t.id === (templateId || templates[0]?.id))
@@ -59,6 +60,7 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
         externalRef: externalId.trim()
           ? { system: 'ITSM', id: externalId.trim(), url: `https://itsm.example.internal/tickets/${externalId.trim()}` }
           : undefined,
+        defaultModelId: modelOverride ?? tpl.defaultModelId,
       })
       toast.success(`${task.code} 업무를 생성했습니다.`)
       onOpenChange(false)
@@ -124,6 +126,17 @@ export function NewTaskDialog({ open, onOpenChange, defaultTemplateId }: NewTask
             <div className="grid gap-1.5">
               <Label htmlFor="nt-ext">외부 시스템 ID</Label>
               <Input id="nt-ext" value={externalId} onChange={(e) => setExternalId(e.target.value)} placeholder="CR-2026-xxxx" />
+            </div>
+            <div className="col-span-2 grid gap-1.5">
+              <Label htmlFor="nt-model">업무 기본 assistant 모델</Label>
+              <Input
+                id="nt-model"
+                value={modelOverride ?? tpl?.defaultModelId ?? ''}
+                onChange={(e) => setModelOverride(e.target.value)}
+                placeholder="비우면 설정의 기본 모델 사용"
+                className="font-mono"
+              />
+              <p className="text-[11px] text-muted-foreground">템플릿 기본값에서 가져옵니다. 단계/대화별로 나중에 바꿀 수 있습니다.</p>
             </div>
           </div>
           {tpl && (

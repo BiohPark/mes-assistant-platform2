@@ -43,6 +43,7 @@ export const SEED_TEMPLATES: WorkflowTemplate[] = [
     name: 'Syncade ET 표준 개발',
     description: '요구사항 분석부터 배포 검증까지 6단계 표준 개발 워크플로우 (GMP 변경관리 대상)',
     category: '기능 개발',
+    defaultModelId: 'glm-5.2',
     createdBy: 'u_park',
     updatedAt: '2026-08-01T00:00:00.000Z',
     steps: [
@@ -125,10 +126,12 @@ export const SEED_TEMPLATES: WorkflowTemplate[] = [
     name: '긴급 변경 (Hotfix)',
     description: '운영 장애 대응용 단축 워크플로우. FDS 생략, 사후 문서화.',
     category: '운영 대응',
+    defaultModelId: 'glm-5.2',
     createdBy: 'u_park',
     updatedAt: '2026-08-10T00:00:00.000Z',
     steps: [
       step('ts_hf_urs', 'URS', '장애 분석', {
+        assistant: { modelId: '', displayName: 'Hotfix Assistant', systemPromptHint: '장애 대응 관점에서 간결하게 답한다.' },
         description: '장애 현상과 원인을 정리하고 조치 범위를 확정한다.',
         inputSpec: ['장애 보고서'],
         outputSpec: ['원인 분석서'],
@@ -141,11 +144,13 @@ export const SEED_TEMPLATES: WorkflowTemplate[] = [
         checklist: [chk('c_hf_3', '조치 완료'), chk('c_hf_4', '롤백 방안 확보')],
       }),
       step('ts_hf_test', 'TEST', '검증', {
+        assistant: { modelId: '', displayName: 'Hotfix Assistant', systemPromptHint: '장애 대응 관점에서 간결하게 답한다.' },
         inputSpec: ['조치 내역'],
         outputSpec: ['검증 결과'],
         checklist: [chk('c_hf_5', '재현 케이스 통과')],
       }),
       step('ts_hf_deploy', 'DEPLOY', '배포 및 사후 문서화', {
+        assistant: { modelId: '', displayName: 'Hotfix Assistant', systemPromptHint: '장애 대응 관점에서 간결하게 답한다.' },
         inputSpec: ['검증 결과'],
         outputSpec: ['배포 검증 결과서', '변경관리 문서'],
         checklist: [chk('c_hf_6', '운영 반영 확인'), chk('c_hf_7', '변경관리(CC) 사후 등록')],
@@ -157,6 +162,7 @@ export const SEED_TEMPLATES: WorkflowTemplate[] = [
     name: '장비 마스터 변경',
     description: '장비 마스터 데이터 신규/변경 등록 워크플로우. 개발 없이 데이터 등록과 검증 중심.',
     category: '마스터 데이터',
+    defaultModelId: 'glm-5.2',
     createdBy: 'u_kimhy',
     updatedAt: '2026-08-15T00:00:00.000Z',
     steps: [

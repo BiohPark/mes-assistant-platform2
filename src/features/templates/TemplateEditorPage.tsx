@@ -114,6 +114,13 @@ export function TemplateEditorPage() {
               <Label htmlFor="tpl-desc">설명</Label>
               <Textarea id="tpl-desc" rows={2} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
             </div>
+            <div className="grid gap-1.5 md:col-span-2">
+              <Label htmlFor="tpl-model">기본 assistant 모델</Label>
+              <Input id="tpl-model" value={draft.defaultModelId ?? ''} onChange={(e) => setDraft({ ...draft, defaultModelId: e.target.value })} placeholder="비우면 설정의 기본 모델 사용" className="font-mono" />
+              <p className="text-[11px] text-muted-foreground">
+                단계에 모델이 지정되지 않은 경우 이 모델을 씁니다. 업무 생성 시 업무 기본 모델로 복사되며, 업무/단계/대화에서 개별 변경할 수 있습니다.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">

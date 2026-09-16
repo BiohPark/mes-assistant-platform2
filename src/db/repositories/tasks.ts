@@ -24,6 +24,7 @@ export interface NewTaskInput {
   dueDate?: string
   externalRef?: Task['externalRef']
   tags?: string[]
+  defaultModelId?: string
 }
 
 export function instantiateStep(taskId: ID, tpl: StepTemplate, order: number): StepInstance {
@@ -83,6 +84,7 @@ export async function createTaskFromTemplate(actor: Actor, input: NewTaskInput):
     dueDate: input.dueDate,
     externalRef: input.externalRef,
     tags: input.tags ?? [],
+    defaultModelId: input.defaultModelId ?? template.defaultModelId,
     createdAt: nowIso(),
     createdBy: actor.userId,
   }
@@ -162,7 +164,9 @@ export async function setStepMode(actor: Actor, stepId: ID, mode: StepMode): Pro
   })
 }
 
-/** 단계 assistant 모델 변경. 빈 문자열이면 설정의 기본 모델을 사용한다. */
+const SCOPE_LABEL = { thread: '이 대화', step: '이 단계', task: '이 업무' } as const
+
+/** 단계 assistant 모델 변경. 빈 문자열이면 상위 기본값(업무/템플릿/설정)을 따른다. */
 export async function setStepModel(actor: Actor, stepId: ID, modelId: string): Promise<void> {
   await db.transaction('rw', db.steps, db.activity, async () => {
     const step = await db.steps.get(stepId)
@@ -173,7 +177,27 @@ export async function setStepModel(actor: Actor, stepId: ID, modelId: string): P
       systemPromptHint: step.assistant?.systemPromptHint ?? '',
     }
     await db.steps.put({ ...step, assistant })
-    await logActivity(actor, step.taskId, 'step.model_changed', { stepName: step.name, modelId: modelId || '(기본)' }, stepId)
+    await logActivity(actor, step.taskId, 'model.changed', { scope: SCOPE_LABEL.step, stepName: step.name, modelId: modelId || '(기본)' }, stepId)
+  })
+}
+
+/** 업무 기본 assistant 모델 변경 */
+export async function setTaskModel(actor: Actor, taskId: ID, modelId: string): Promise<void> {
+  await db.transaction('rw', db.tasks, db.activity, async () => {
+    const task = await db.tasks.get(taskId)
+    if (!task) return
+    await db.tasks.update(taskId, { defaultModelId: modelId })
+    await logActivity(actor, taskId, 'model.changed', { scope: SCOPE_LABEL.task, modelId: modelId || '(기본)' })
+  })
+}
+
+/** 특정 대화(스레드)에서만 쓰는 모델 변경 */
+export async function setThreadModel(actor: Actor, threadId: ID, modelId: string): Promise<void> {
+  await db.transaction('rw', db.threads, db.activity, async () => {
+    const thread = await db.threads.get(threadId)
+    if (!thread) return
+    await db.threads.update(threadId, { modelId })
+    await logActivity(actor, thread.taskId, 'model.changed', { scope: SCOPE_LABEL.thread, thread: thread.title, modelId: modelId || '(기본)' }, thread.stepInstanceId)
   })
 }
 
