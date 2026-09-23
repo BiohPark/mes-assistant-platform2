@@ -44,12 +44,12 @@ export interface Assistant {
   status: AssistantStatus
   /** 사용법 (markdown) */
   usageExample: string
-  /** 앱 내 채팅 시 역할 지침 */
+  /** @deprecated 역할·흐름은 각 assistant(OpenWebUI) 쪽에서 관리한다. 예전 데이터 호환용으로만 남기고 프롬프트에 넣지 않는다 */
   systemPromptHint?: string
   /** 카드 이미지 (FileAsset). 없으면 이니셜 */
   imageId?: ID
   color: string
-  /** 새 업무 생성 시 복사되는 체크리스트 */
+  /** 새 대화에 복사되는 체크리스트 (강제 아님, 달성도 점검용) */
   checklistTemplate: ChecklistTemplateItem[]
   createdBy: ID
   createdAt: ISODate
@@ -112,6 +112,8 @@ export interface Task {
   /** 업무 단위 모델 오버라이드 */
   modelId?: string
   feedback?: Feedback
+  /** 가장 최근 AI 달성도 점검 (강제 아님, 참고용 점수) */
+  checklistReview?: ChecklistReview
   createdAt: ISODate
   createdBy: ID
   /** 칸반 정렬용 최근 활동 시각 */
@@ -119,6 +121,24 @@ export interface Task {
   startedAt?: ISODate
   completedAt?: ISODate
   completedBy?: ID
+}
+
+/** 체크리스트 항목별 AI 판단 */
+export interface ChecklistReviewItem {
+  itemId: ID
+  met: boolean
+  note: string
+}
+
+/** AI 달성도 점검 결과: n개 중 m개 달성. 체크 상태를 바꾸지 않는 참고 점수다. */
+export interface ChecklistReview {
+  at: ISODate
+  by: ID
+  met: number
+  total: number
+  items: ChecklistReviewItem[]
+  /** ai = 모델 판단, rule = Mock/실패 시 규칙 기반 */
+  source: 'ai' | 'rule'
 }
 
 export interface Thread {
@@ -171,6 +191,8 @@ export interface FileAsset {
   version: number
   /** 이전 버전 파일. 버전 체인은 previousId를 따라간다 */
   previousId?: ID
+  /** OpenWebUI Files API에 올린 파일 ID (서버 주소별 캐시). 같은 버전은 다시 올리지 않는다 */
+  remoteIds?: Record<string, string>
 }
 
 export interface Note {
@@ -223,6 +245,7 @@ export type ActivityType =
   | 'task.status_changed'
   | 'checklist.checked'
   | 'checklist.unchecked'
+  | 'checklist.reviewed'
   | 'file.uploaded'
   | 'file.tagged_output'
   | 'input.selected'
@@ -257,11 +280,16 @@ export interface ActivityLog {
 
 export type LlmMode = 'mock' | 'live'
 
+/** 선택한 입력 파일을 assistant에 넘기는 방식. openwebui = Files API 첨부, inline = 텍스트를 프롬프트에 붙임 */
+export type FileDelivery = 'inline' | 'openwebui'
+
 export interface LlmSettings {
   mode: LlmMode
   baseUrl: string
   apiKey: string
   model: string
+  /** 없으면 inline */
+  fileDelivery?: FileDelivery
 }
 
 export interface Settings {

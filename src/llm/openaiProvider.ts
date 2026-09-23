@@ -62,6 +62,7 @@ export class OpenAICompatibleProvider implements ChatProvider {
           model: req.model || this.settings.model,
           messages: req.messages,
           tools: req.tools,
+          ...(req.files?.length ? { files: req.files } : {}),
           stream: true,
         }),
       })

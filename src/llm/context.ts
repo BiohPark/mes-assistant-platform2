@@ -37,6 +37,8 @@ export interface PromptInput {
   file: FileAsset
   weight: TaskInput['weight']
   source?: string
+  /** OpenWebUI Files API로 첨부되어 본문을 인라인하지 않음 */
+  attached?: boolean
 }
 
 const WEIGHT_LABEL: Record<TaskInput['weight'], string> = { main: '주 입력', reference: '참고 입력' }
@@ -45,7 +47,10 @@ const WEIGHT_LABEL: Record<TaskInput['weight'], string> = { main: '주 입력', 
 async function renderInputs(inputs: PromptInput[]): Promise<string[]> {
   const ordered = [...inputs.filter((i) => i.weight === 'main'), ...inputs.filter((i) => i.weight !== 'main')]
   return Promise.all(
-    ordered.map(({ file, weight, source }) => renderFile(file, `[${WEIGHT_LABEL[weight]}] ${file.name} v${file.version}${source ? ` — 출처: ${source}` : ''}`)),
+    ordered.map(({ file, weight, source, attached }) => {
+      const label = `[${WEIGHT_LABEL[weight]}] ${file.name} v${file.version}${source ? ` — 출처: ${source}` : ''}`
+      return attached ? Promise.resolve(`### ${label} (첨부 파일로 전달)`) : renderFile(file, label)
+    }),
   )
 }
 
@@ -59,25 +64,27 @@ export interface TaskPromptInput {
   participants?: Array<{ name: string; role: string }>
 }
 
+/** 플랫폼이 붙이는 정보가 작업 지시가 아님을 밝힌다. 작업 흐름·역할은 assistant 자체 지침을 따른다. */
+export const PLATFORM_CONTEXT_NOTE =
+  '## 플랫폼 컨텍스트\n아래는 대화 관리 플랫폼(Agent Hub)이 붙인 참고 정보다. 작업 방식과 질문 흐름은 이 assistant의 자체 지침을 따른다.'
+
 /**
- * 업무 assistant 호출용 system 메시지.
- * 역할 지침 + 어시스턴트/대화 요약·태그 + 연결 SR + 참여자 + 선택한 입력(주 입력 먼저, 텍스트 인라인)을 주입한다.
- * 실서비스에서는 OpenWebUI files API(파일 업로드 → chat 요청의 files 파라미터)로 대체 가능.
+ * 대화 assistant 호출용 system 메시지 — **컨텍스트만** 담는다.
+ * 대화 정보·태그 + 연결 SR + 참여자 + 사람이 고른 입력(주 입력 먼저)을 넣는다.
+ * 역할 지침·단계 흐름·체크리스트는 넣지 않는다(각 assistant 쪽에서 관리).
+ * 입력은 OpenWebUI Files API로 첨부되면 목록만, 아니면 텍스트를 인라인한다.
  */
 export async function buildTaskSystemPrompt(input: TaskPromptInput): Promise<string> {
   const { assistant, task, linkedSrs, inputs, participants = [] } = input
-  const checklist = task.checklist.length
-    ? task.checklist.map((c) => `- [${c.checked ? 'x' : ' '}] ${c.label}${c.required ? ' (필수)' : ''}`).join('\n')
-    : '- (없음)'
   const parts: string[] = [
-    assistant.systemPromptHint ? `역할 지침: ${assistant.systemPromptHint}` : '',
-    `## 어시스턴트: ${assistant.name} (${assistant.level1} > ${assistant.level2})\n${assistant.summary}`,
-    `## 업무: ${task.code} ${task.title}\n- 요약: ${task.summary || '(없음)'}\n- 태그: ${task.tags?.length ? task.tags.join(', ') : '(없음)'}\n- 체크리스트:\n${checklist}`,
+    PLATFORM_CONTEXT_NOTE,
+    `## 에이전트: ${assistant.name} (${assistant.level1} > ${assistant.level2})`,
+    `## 대화: ${task.code} ${task.title}\n- 요약: ${task.summary || '(없음)'}\n- 태그: ${task.tags?.length ? task.tags.join(', ') : '(없음)'}`,
   ]
   if (participants.length >= 2) {
     parts.push(
       `## 참여자 (다중 참여 대화)\n${participants.map((p) => `- ${p.name}${p.role ? ` (${p.role})` : ''}`).join('\n')}\n` +
-        `사용자 메시지는 "[이름] 내용" 형식으로 발화자를 표시한다. 누가 무엇을 요청했는지 구분해서 답하고, 특정 참여자에게 확인이 필요하면 이름을 지목해서 질문한다.`,
+        `사용자 메시지 앞의 "[이름]"은 발화자 표시다.`,
     )
   }
   // 주입 자료는 가드 안내 뒤에 모아 둔다
@@ -97,11 +104,11 @@ export interface SrPromptInput {
   files: FileAsset[]
 }
 
-/** SR 접수 도우미용 system 메시지 */
+/** SR 접수 대화용 system 메시지 — 접수 에이전트의 자체 흐름을 따르고, 플랫폼은 접수 상태만 알린다 */
 export async function buildSrSystemPrompt({ intake, sr, files }: SrPromptInput): Promise<string> {
   const parts = [
-    intake.systemPromptHint ? `역할 지침: ${intake.systemPromptHint}` : '',
-    `## 목표\n요청자의 이야기를 듣고 서비스 요청(SR)을 다음 항목으로 구조화한다: 제목, 배경, 원하는 결과, 희망 기한. 한 번에 하나씩만 확인 질문한다. 항목이 충분히 모이면 "상단의 '접수로 전환' 버튼을 눌러 접수하세요"라고 안내한다.`,
+    PLATFORM_CONTEXT_NOTE,
+    `## 에이전트: ${intake.name}\n이 대화는 서비스 요청(SR) 접수용이다. 요청자는 준비되면 화면의 "접수로 전환" 버튼으로 접수한다.`,
     sr.status !== 'draft' ? `## 현재 접수 내용 (${sr.code})\n제목: ${sr.title}\n${sr.body}` : '',
   ]
   if (files.length) parts.push(INJECTION_GUARD, `## 첨부 파일\n${(await renderFiles(files)).join('\n\n')}`)

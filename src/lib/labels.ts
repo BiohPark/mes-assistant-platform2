@@ -47,6 +47,7 @@ export const ACTIVITY_LABEL: Record<ActivityType, string> = {
   'task.status_changed': '상태 변경',
   'checklist.checked': '체크리스트 완료',
   'checklist.unchecked': '체크리스트 해제',
+  'checklist.reviewed': 'AI 달성도 점검',
   'file.uploaded': '파일 업로드',
   'file.tagged_output': '산출물 저장',
   'input.selected': '입력 선택',

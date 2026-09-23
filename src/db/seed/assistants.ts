@@ -4,6 +4,7 @@ import { pickColor } from '@/lib/colors'
 // 데모용 가상 카탈로그. 실제 회사에서는 관리 페이지(또는 이 파일)에서 에이전트 이름·설명·모델 ID·링크1을
 // 사내 OpenWebUI 설정에 맞게 바꿔 쓴다. 모델 ID는 모두 비워 두어 설정의 공통 기본 모델을 쓴다.
 // 링크1도 비워 두면 설정의 OpenWebUI 주소 + `?model={모델 ID}` 로 만들어진다.
+// 질문 흐름·역할 같은 워크플로우는 각 assistant(OpenWebUI) 안에 있고, 여기에는 안내 문구만 둔다.
 
 const T = '2026-09-01T00:00:00.000Z'
 
@@ -23,7 +24,6 @@ interface Spec {
   inputs?: string[]
   outputs?: string[]
   checklist?: Array<[string, boolean]>
-  hint?: string
 }
 
 const START = '"시작"을 보내면 필요한 정보를 하나씩 질문합니다.'
@@ -39,7 +39,6 @@ const SPECS: Spec[] = [
     status: 'open',
     usage: [START, '작성 또는 검토 중 하나를 고릅니다.', '작성: 섹션을 고르면 들어가야 할 내용과 예시를 보여 주고 필요한 정보를 묻습니다.', '검토: 작성한 내용을 붙여 넣으면 누락·모호한 표현을 짚어 줍니다.'],
     outputs: ['Deviation 섹션별 초안'],
-    hint: '당신은 GMP 일탈 보고서 작성 도우미다. 작성과 검토 중 무엇을 원하는지 먼저 확인하고, 섹션별로 한 번에 하나씩 질문한다.',
   },
   {
     id: 'cc-writer',
@@ -52,7 +51,6 @@ const SPECS: Spec[] = [
     usage: [START, 'CC Item 분해 도우미의 산출물을 입력으로 선택하면 섹션 작성에 반영됩니다.', '질문에 답하면 배경·변경 내용·위험 평가·실행 계획 순으로 초안을 만듭니다.'],
     inputs: ['CC Item 목록', '대상 설비/시스템 식별자', '관련 위험 평가 목록'],
     outputs: ['CC 문서 초안 (배경 · 변경 내용 · 위험 평가 · 실행 계획)'],
-    hint: '사용자가 "시작"이라고 입력하면 대상 식별자 → 관련 위험 평가 → CC Item 목록 확인 순으로 질문한 뒤 4개 섹션 초안을 작성한다. 제공된 자료 밖의 내용은 추측하지 않는다.',
   },
   {
     id: 'cc-item-builder',
@@ -101,7 +99,6 @@ const SPECS: Spec[] = [
       ['변경 범위 확정', true],
       ['요청자 확인', false],
     ],
-    hint: '당신은 MES 요구사항 분석가다. 요청자와 대화하며 변경 범위를 확정하고 URS 표(ID, 대상, 요구사항, 우선순위, GxP)로 정리한다. 한 번에 하나씩 질문한다.',
   },
   {
     id: 'fds-writer',
@@ -186,7 +183,6 @@ export const SEED_ASSISTANTS: Assistant[] = SPECS.map((s, i) => ({
   ownerId: s.ownerId,
   status: s.status,
   usageExample: s.usage?.length ? `### 사용법\n${s.usage.map((u) => `- ${u}`).join('\n')}` : '',
-  systemPromptHint: s.hint,
   checklistTemplate: ct(s.id, s.checklist ?? []),
   color: pickColor(s.id),
   createdBy: 'u_so',

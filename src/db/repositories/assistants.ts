@@ -18,7 +18,6 @@ export interface AssistantInput {
   ownerId: ID
   status: AssistantStatus
   usageExample: string
-  systemPromptHint?: string
   checklistTemplate: ChecklistTemplateItem[]
 }
 

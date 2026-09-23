@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../schema'
 import { createAssistant, reorderAssistants } from './assistants'
-import { addTag, deleteTask, removeTag, setInput, setTaskTitle, startConversation, switchInputVersion } from './tasks'
+import { addTag, applyChecklistReview, deleteTask, removeTag, saveChecklistReview, setInput, setTaskTitle, startConversation, switchInputVersion } from './tasks'
 import { saveAssistantOutput } from './files'
 import { conversationsForSr, setSrTitle, startSrConversation, startTaskFromSr, submitSr } from './sr'
 import { DEFAULT_LLM_SETTINGS } from '@/domain/types'
@@ -130,5 +130,31 @@ describe('reorderAssistants', () => {
     await reorderAssistants(so, ['test', 'urs'])
     const order = (await db.assistants.orderBy('order').toArray()).map((a) => a.id)
     expect(order).toEqual(['test', 'urs', 'fds'])
+  })
+})
+
+describe('checklist review', () => {
+  it('saves an m/n review without touching checks; apply checks only AI-met items', async () => {
+    await db.assistants.update('fds', { checklistTemplate: [{ id: 't1', label: 'A', required: true }, { id: 't2', label: 'B', required: false }] })
+    const { task } = await startConversation(dev, { assistantId: 'fds' })
+    const [a, b] = task.checklist
+    await saveChecklistReview(dev, task.id, {
+      at: '2026-09-23T00:00:00.000Z',
+      by: dev.userId,
+      met: 1,
+      total: 2,
+      source: 'ai',
+      items: [
+        { itemId: a.id, met: true, note: '근거' },
+        { itemId: b.id, met: false, note: '' },
+      ],
+    })
+    const saved = (await db.tasks.get(task.id))!
+    expect(saved.checklistReview).toMatchObject({ met: 1, total: 2 })
+    expect(saved.checklist.every((c) => !c.checked)).toBe(true)
+    expect(await applyChecklistReview(dev, task.id)).toBe(1)
+    const after = (await db.tasks.get(task.id))!
+    expect(after.checklist.map((c) => c.checked)).toEqual([true, false])
+    expect(await db.activity.where('type').equals('checklist.reviewed').count()).toBe(1)
   })
 })

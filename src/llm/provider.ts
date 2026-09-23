@@ -27,6 +27,8 @@ export interface ChatRequest {
   signal?: AbortSignal
   /** Mock 응답 선택용 힌트 (실제 provider는 무시) */
   meta?: ChatMeta
+  /** OpenWebUI Files API로 올린 첨부 (OpenWebUI 확장 파라미터) */
+  files?: Array<{ type: 'file'; id: string }>
 }
 
 export interface ChatMeta {

@@ -5,7 +5,7 @@ import { notify } from './notifications'
 import { newId, nowIso } from '@/lib/ids'
 import { applyTaskStatus, toggleChecklistItem } from '@/domain/transitions'
 import { isSrTag, normalizeTag, tagKey } from '@/domain/tags'
-import type { ChecklistItem, ID, Priority, Task, TaskInput, TaskStatus, Thread } from '@/domain/types'
+import type { ChecklistItem, ChecklistReview, ID, Priority, Task, TaskInput, TaskStatus, Thread } from '@/domain/types'
 
 /** `PREFIX-YYYY-NNNN` 형식의 다음 코드 */
 export async function nextCode(prefix: 'WK' | 'SR', existing: string[]): Promise<string> {
@@ -178,6 +178,27 @@ export async function setTaskStatus(actor: Actor, taskId: ID, status: TaskStatus
     const type = task.status === 'done' && status !== 'done' ? 'task.reopened' : STATUS_ACTIVITY[status]
     await logActivity(actor, { taskId, assistantId: task.assistantId }, type, { from: task.status, to: status, ...payload })
   })
+}
+
+/** AI 달성도 점검 결과 저장 (체크 상태는 그대로). 이력에 m/n을 남긴다. */
+export async function saveChecklistReview(actor: Actor, taskId: ID, review: ChecklistReview): Promise<void> {
+  await db.transaction('rw', db.tasks, db.activity, async () => {
+    const task = await db.tasks.get(taskId)
+    if (!task) return
+    await db.tasks.put({ ...task, checklistReview: review })
+    await logActivity(actor, { taskId }, 'checklist.reviewed', { met: review.met, total: review.total, source: review.source })
+  })
+}
+
+/** AI가 달성으로 판단한 항목 중 아직 체크하지 않은 것을 사용자가 한 번에 체크 */
+export async function applyChecklistReview(actor: Actor, taskId: ID): Promise<number> {
+  const task = await db.tasks.get(taskId)
+  const review = task?.checklistReview
+  if (!task || !review) return 0
+  const metIds = new Set(review.items.filter((i) => i.met).map((i) => i.itemId))
+  const targets = task.checklist.filter((c) => metIds.has(c.id) && !c.checked)
+  for (const c of targets) await toggleChecklist(actor, taskId, c.id)
+  return targets.length
 }
 
 export async function toggleChecklist(actor: Actor, taskId: ID, itemId: ID): Promise<void> {

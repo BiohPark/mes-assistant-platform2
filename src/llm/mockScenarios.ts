@@ -1,3 +1,8 @@
+/**
+ * Mock 모드 전용 **대역(stand-in)** 응답.
+ * 실제 질문 흐름·작성 절차는 각 assistant(OpenWebUI) 안에서 따로 구현되며, 이 플랫폼은 흉내만 낸다.
+ * Live 모드에서는 이 파일이 쓰이지 않는다. 시연용이므로 실제 assistant 동작과 달라도 된다.
+ */
 export interface MockContext {
   taskTitle: string
   assistantName: string

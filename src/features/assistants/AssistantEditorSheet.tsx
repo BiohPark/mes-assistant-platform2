@@ -29,7 +29,7 @@ interface AssistantEditorSheetProps {
 type Form = AssistantInput
 
 function emptyForm(ownerId: string): Form {
-  return { id: '', name: '', level1: '', level2: '', summary: '', docUrl: '', modelId: '', link1: '', expectedInputs: [], expectedOutputs: [], ownerId, status: 'developing', usageExample: '', systemPromptHint: '', checklistTemplate: [] }
+  return { id: '', name: '', level1: '', level2: '', summary: '', docUrl: '', modelId: '', link1: '', expectedInputs: [], expectedOutputs: [], ownerId, status: 'developing', usageExample: '', checklistTemplate: [] }
 }
 
 /** "a, b ,, c" → ['a','b','c'] */
@@ -52,7 +52,6 @@ function formFrom(a: Assistant): Form {
     ownerId: a.ownerId,
     status: a.status,
     usageExample: a.usageExample,
-    systemPromptHint: a.systemPromptHint ?? '',
     checklistTemplate: a.checklistTemplate,
   }
 }
@@ -93,7 +92,6 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
         link1: form.link1?.trim() || undefined,
         expectedInputs: splitList(inputsText),
         expectedOutputs: splitList(outputsText),
-        systemPromptHint: form.systemPromptHint?.trim() || undefined,
         checklistTemplate: form.checklistTemplate.filter((c) => c.label.trim()),
       }
       if (isNew) {
@@ -245,13 +243,8 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="as-hint">역할 지침 (앱 내 채팅 system prompt)</Label>
-            <Textarea id="as-hint" rows={3} value={form.systemPromptHint ?? ''} onChange={(e) => patch({ systemPromptHint: e.target.value })} />
-          </div>
-
-          <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
-              <Label>체크리스트 템플릿</Label>
+              <Label>체크리스트 템플릿 (선택 · 강제 아님)</Label>
               <Button type="button" size="xs" variant="ghost" onClick={() => patch({ checklistTemplate: [...form.checklistTemplate, newChecklistTemplateItem('')] })}>
                 <Plus data-icon="inline-start" />
                 항목
@@ -262,7 +255,7 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
               <div key={c.id} className="flex items-center gap-2">
                 <Input value={c.label} onChange={(e) => updateChecklist(c.id, { label: e.target.value })} className="h-8" placeholder="항목" />
                 <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  <Switch checked={c.required} onCheckedChange={(v) => updateChecklist(c.id, { required: v })} /> 필수
+                  <Switch checked={c.required} onCheckedChange={(v) => updateChecklist(c.id, { required: v })} /> 중요
                 </label>
                 <Button type="button" size="icon-xs" variant="ghost" onClick={() => patch({ checklistTemplate: form.checklistTemplate.filter((x) => x.id !== c.id) })}>
                   <Trash2 />

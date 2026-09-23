@@ -12,6 +12,7 @@ describe('buildTaskReport', () => {
         checklist: [{ id: 'c', label: 'A', required: true, checked: true }],
         outputFileIds: ['f1'],
         tags: ['SR-2026-0002'],
+        checklistReview: { at: '2026-09-05T00:00:00.000Z', by: 'u1', met: 1, total: 1, items: [], source: 'ai' },
         createdAt: '2026-09-01T00:00:00.000Z',
         startedAt: '2026-09-01T00:00:00.000Z',
         completedAt: '2026-09-05T00:00:00.000Z',
@@ -25,7 +26,8 @@ describe('buildTaskReport', () => {
     })
     expect(md).toContain('# 업무 완료 리포트 — WK-2026-0001 T')
     expect(md).toContain('URS 작성 도우미')
-    expect(md).toContain('- [x] A (필수)')
+    expect(md).toContain('- [x] A (중요)')
+    expect(md).toContain('- AI 달성도: 1/1')
     expect(md).toContain('URS.md')
     expect(md).toContain('태그: SR-2026-0002')
     expect(md).toContain('[주 입력] FDS.md v2 ← FDS 작성 도우미')

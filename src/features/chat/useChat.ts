@@ -8,6 +8,7 @@ import { createProvider } from '@/llm'
 import { buildSrSystemPrompt, buildTaskSystemPrompt, srMeta, taskMeta, threadParticipants, toChatMessages, type PromptInput } from '@/llm/context'
 import type { ChatMeta, ChatProvider } from '@/llm/provider'
 import { suggestTitle } from '@/llm/title'
+import { deliverFiles, usesFilesApi, type AttachedFile } from '@/llm/openwebuiFiles'
 import { resolveModel } from '@/domain/modelResolution'
 import { isSrTag } from '@/domain/tags'
 import type { Actor } from '@/db/repositories/activity'
@@ -32,6 +33,10 @@ interface PromptBundle {
   systemPrompt: string
   modelId: string
   meta: ChatMeta
+  /** OpenWebUI Files API 첨부 */
+  files?: AttachedFile[]
+  /** 첨부하지 못해 인라인으로 대신한 파일 (전송 기록용) */
+  deliveryFallbacks?: Array<{ name: string; reason: string }>
 }
 
 /** 선택한 입력(주 입력 먼저) + 이번 메시지 첨부(참고). 출처 대화 표기를 붙인다. */
@@ -66,14 +71,19 @@ async function buildPrompt(scope: ChatScope, thread: Thread, history: Message[],
   const task = (await db.tasks.get(scope.task.id)) ?? scope.task
   const { assistant } = scope
   const srCodes = task.tags.filter(isSrTag)
-  const [inputs, linkedSrs] = await Promise.all([
+  const [loaded, linkedSrs] = await Promise.all([
     loadInputs(task, attachmentIds),
     srCodes.length ? db.serviceRequests.where('code').anyOf(srCodes).toArray() : Promise.resolve([]),
   ])
+  // 파일은 assistant가 자기 방식으로 읽도록 OpenWebUI에 첨부하고, 실패한 것만 텍스트로 붙인다
+  const delivery = usesFilesApi(settings.llm) ? await deliverFiles(settings.llm, loaded.map((i) => i.file)) : undefined
+  const inputs = loaded.map((i) => ({ ...i, attached: !!delivery?.attached.has(i.file.id) }))
   return {
     systemPrompt: await buildTaskSystemPrompt({ assistant, task, linkedSrs, inputs, participants: threadParticipants(history, users) }),
     modelId: resolveModel({ thread, task, assistant, settings: settings.llm }).modelId,
     meta: taskMeta(assistant, task, inputs.map((i) => i.file)),
+    files: delivery ? [...delivery.attached.values()] : undefined,
+    deliveryFallbacks: delivery?.failed.map((f) => ({ name: f.file.name, reason: f.reason })),
   }
 }
 
@@ -136,7 +146,7 @@ export function useChat(actor: Actor | undefined, scope: ChatScope): ChatState {
       const settings = await getSettings()
       const provider = createProvider(settings.llm)
       const users = new Map((await db.users.toArray()).map((x) => [x.id, { name: x.name, role: x.role }]))
-      const { systemPrompt, modelId, meta } = await buildPrompt(scope, t, history, attachmentIds)
+      const { systemPrompt, modelId, meta, files, deliveryFallbacks } = await buildPrompt(scope, t, history, attachmentIds)
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -146,8 +156,12 @@ export function useChat(actor: Actor | undefined, scope: ChatScope): ChatState {
       let requestSnapshot: string | undefined
 
       try {
-        const request = { model: modelId, messages: toChatMessages(systemPrompt, history, users), signal: controller.signal, meta }
-        requestSnapshot = JSON.stringify({ sentAt: new Date().toISOString(), provider: provider.kind, model: request.model, meta, messages: request.messages }, null, 2)
+        const request = { model: modelId, messages: toChatMessages(systemPrompt, history, users), signal: controller.signal, meta, files }
+        requestSnapshot = JSON.stringify(
+          { sentAt: new Date().toISOString(), provider: provider.kind, model: request.model, meta, files, deliveryFallbacks, messages: request.messages },
+          null,
+          2,
+        )
         for await (const chunk of provider.stream(request)) {
           if (chunk.type === 'delta') {
             acc += chunk.text

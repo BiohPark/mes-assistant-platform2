@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { INJECTION_GUARD, buildSrSystemPrompt, buildTaskSystemPrompt, toChatMessages } from './context'
+import { INJECTION_GUARD, PLATFORM_CONTEXT_NOTE, buildSrSystemPrompt, buildTaskSystemPrompt, toChatMessages } from './context'
 import type { Assistant, FileAsset, ServiceRequest, Task } from '@/domain/types'
 
 const assistant = {
@@ -31,7 +31,7 @@ const file = (name: string, text: string): FileAsset => ({
 })
 
 describe('buildTaskSystemPrompt', () => {
-  it('includes role hint, assistant, task, tags, srs, inputs', async () => {
+  it('carries context only: agent, conversation, tags, srs, inputs — no role hint or checklist', async () => {
     const sr = { code: 'SR-2026-0002', title: '알람 필터', body: '알람 목록에 필터가 필요' } as ServiceRequest
     const p = await buildTaskSystemPrompt({
       assistant,
@@ -40,10 +40,11 @@ describe('buildTaskSystemPrompt', () => {
       inputs: [{ file: file('URS.md', '# URS\nURS-01'), weight: 'main', source: 'WK-2026-0001 · URS 분석 도우미' }],
       participants: [],
     })
-    expect(p).toContain('역할 지침: 당신은 FDS 전문가다.')
-    expect(p).toContain('## 어시스턴트: FDS 작성 도우미 (ET 개발 > FDS 작성)')
+    expect(p.startsWith(PLATFORM_CONTEXT_NOTE)).toBe(true)
+    expect(p).not.toContain('당신은 FDS 전문가다')
+    expect(p).not.toContain('추적성')
+    expect(p).toContain('## 에이전트: FDS 작성 도우미 (ET 개발 > FDS 작성)')
     expect(p).toContain('WK-2026-0002')
-    expect(p).toContain('- [ ] 추적성 (필수)')
     expect(p).toContain('- 태그: SR-2026-0002, alarm')
     expect(p).toContain('## 연결된 SR (1)')
     expect(p).toContain('SR-2026-0002')
@@ -68,12 +69,12 @@ describe('buildTaskSystemPrompt', () => {
 })
 
 describe('buildSrSystemPrompt', () => {
-  it('describes intake goal and current draft', async () => {
+  it('states the SR context without interview instructions', async () => {
     const sr = { code: '', title: '', body: '', status: 'draft' } as ServiceRequest
-    const p = await buildSrSystemPrompt({ intake: { ...assistant, systemPromptHint: '접수 도우미' } as Assistant, sr, files: [] })
-    expect(p).toContain('접수 도우미')
-    expect(p).toContain('제목')
-    expect(p).toContain('희망 기한')
+    const p = await buildSrSystemPrompt({ intake: assistant, sr, files: [] })
+    expect(p).toContain('서비스 요청(SR) 접수용')
+    expect(p).not.toContain('당신은 FDS 전문가다')
+    expect(p).not.toContain('희망 기한')
     expect(p).not.toContain('현재 접수 내용')
   })
   it('includes submitted content', async () => {
@@ -120,6 +121,21 @@ describe('prompt injection guard', () => {
 })
 
 describe('selected inputs in prompt', () => {
+  it('lists attached (Files API) inputs without inlining their text', async () => {
+    const p = await buildTaskSystemPrompt({
+      assistant,
+      task,
+      linkedSrs: [],
+      inputs: [
+        { file: file('big.md', 'SECRET BODY'), weight: 'main', attached: true },
+        { file: file('small.md', 'inline body'), weight: 'reference' },
+      ],
+    })
+    expect(p).toContain('### [주 입력] big.md v1 (첨부 파일로 전달)')
+    expect(p).not.toContain('SECRET BODY')
+    expect(p).toContain('inline body')
+  })
+
   it('puts main inputs before references regardless of selection order', async () => {
     const p = await buildTaskSystemPrompt({
       assistant,
