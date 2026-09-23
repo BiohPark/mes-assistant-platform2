@@ -21,6 +21,7 @@ describe('seed', () => {
     expect(await database.assistants.count()).toBe(SEED_ASSISTANTS.length)
     expect((await database.assistants.orderBy('order').toArray()).map((a) => a.id)).toEqual(SEED_ASSISTANTS.map((a) => a.id))
     expect((await database.settings.get('app'))?.srIntakeAssistantId).toBe(SR_INTAKE_ASSISTANT_ID)
+    expect((await database.users.toArray()).filter((u) => u.isSystemOwner).map((u) => u.id).sort()).toEqual(['u_dev1', 'u_dev2', 'u_dev3', 'u_req', 'u_so'])
     // 모든 에이전트에 기본 체크리스트(관리 페이지에서 수정)
     for (const a of await database.assistants.toArray()) expect(a.checklistTemplate.length).toBeGreaterThan(0)
     expect(await database.serviceRequests.count()).toBe(6)
