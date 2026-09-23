@@ -364,7 +364,7 @@ export function buildSeedData(now: Date): SeedBundle {
     turns: ['제 업무만 보이는 대시보드가 있으면 좋겠어요', '요청 잘 들었습니다. **배경**을 알려주세요.'],
   })
 
-  // ── 알림 (한지수 기준 미읽음 2, 읽음 1)
+  // ── 알림 (기본 사용자 u_so 기준 미읽음 2, 읽음 1)
   b.notify('u_so', '대화에 참여자로 추가되었습니다', `${t3.code} ${t3.title}`, `/c/${t3.id}`, 5, true)
   b.notify('u_so', 'SR이 접수되었습니다', 'SR-2026-0001 포장 라인 화면 폰트 확대', '/sr/manage', 2)
   b.notify('u_so', '대화에 참여자로 추가되었습니다', `${t7.code} ${t7.title}`, `/c/${t7.id}`, 4)
