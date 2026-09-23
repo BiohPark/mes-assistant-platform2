@@ -14,15 +14,15 @@ import { setLlmSettings, setSrIntakeAssistant } from '@/db/repositories/settings
 import { exportAll, importAll, validateBundle, type ExportBundle } from '@/db/exportImport'
 import { resetToSeed } from '@/db/seed'
 import { createProvider } from '@/llm'
-import { type LlmMode, type LlmSettings, type Settings } from '@/domain/types'
+import { type FileDelivery, type LlmMode, type LlmSettings, type Settings } from '@/domain/types'
 import { downloadBlob } from '@/db/repositories/files'
 import { useModelList } from '@/llm/useModelList'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const PRESETS = [
-  { label: 'OpenWebUI', baseUrl: 'http://openwebui.internal/api', model: 'glm-5.2', hint: 'OpenWebUI: /api/chat/completions, /api/models. 워크스페이스 모델(assistant) ID를 그대로 사용' },
-  { label: 'vLLM / OpenAI 호환', baseUrl: 'http://llm.internal:8000/v1', model: '', hint: 'vLLM, LiteLLM, Ollama(/v1) 등 OpenAI-compatible 서버' },
-  { label: '로컬 Ollama', baseUrl: 'http://localhost:11434/v1', model: '', hint: 'Ollama OpenAI 호환 엔드포인트 (OLLAMA_ORIGINS 설정 필요)' },
+  { label: 'OpenWebUI', baseUrl: 'http://openwebui.internal/api', model: 'glm-5.2', fileDelivery: 'openwebui' as const, hint: 'OpenWebUI: /api/chat/completions, /api/models, 파일은 /api/v1/files/. 워크스페이스 모델(assistant) ID를 그대로 사용' },
+  { label: 'vLLM / OpenAI 호환', baseUrl: 'http://llm.internal:8000/v1', model: '', fileDelivery: 'inline' as const, hint: 'vLLM, LiteLLM, Ollama(/v1) 등 OpenAI-compatible 서버' },
+  { label: '로컬 Ollama', baseUrl: 'http://localhost:11434/v1', model: '', fileDelivery: 'inline' as const, hint: 'Ollama OpenAI 호환 엔드포인트 (OLLAMA_ORIGINS 설정 필요)' },
 ]
 
 /** 설정이 로드된 뒤 폼을 마운트해 초기값을 state로 바로 쓴다 (effect로 동기화하지 않음) */
@@ -98,7 +98,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
               <div className="grid gap-1.5">
                 <Label>모드</Label>
                 <ToggleGroup type="single" value={llm.mode} onValueChange={(v) => v && setLlm({ ...llm, mode: v as LlmMode })} variant="outline" size="sm">
-                  <ToggleGroupItem value="mock">Mock (오프라인 시연)</ToggleGroupItem>
+                  <ToggleGroupItem value="mock">Mock (오프라인 시연 · 응답은 대역)</ToggleGroupItem>
                   <ToggleGroupItem value="live">Live (실제 endpoint)</ToggleGroupItem>
                 </ToggleGroup>
               </div>
@@ -107,7 +107,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
                   <Label>사내 API 프리셋</Label>
                   <div className="flex flex-wrap gap-1.5">
                     {PRESETS.map((p) => (
-                      <Button key={p.label} type="button" variant="outline" size="sm" onClick={() => setLlm({ ...llm, baseUrl: p.baseUrl, model: p.model || llm.model })} title={p.hint}>
+                      <Button key={p.label} type="button" variant="outline" size="sm" onClick={() => setLlm({ ...llm, baseUrl: p.baseUrl, model: p.model || llm.model, fileDelivery: p.fileDelivery })} title={p.hint}>
                         {p.label}
                       </Button>
                     ))}
@@ -154,6 +154,24 @@ function SettingsForm({ settings }: { settings: Settings }) {
                     모델 결정 순서: 대화 지정 → 에이전트 매핑(관리 페이지의 모델 ID) → 이 공통 기본 모델. 매핑하지 않은 에이전트와 시스템 assistant는 이 모델로 대화합니다. Mock 모드에서는 모델과 무관하게 시나리오 응답이 나옵니다.
                   </p>
                 </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>입력 파일 전달 방식</Label>
+                <ToggleGroup
+                  type="single"
+                  value={llm.fileDelivery ?? 'inline'}
+                  onValueChange={(v) => v && setLlm({ ...llm, fileDelivery: v as FileDelivery })}
+                  variant="outline"
+                  size="sm"
+                  disabled={llm.mode === 'mock'}
+                >
+                  <ToggleGroupItem value="openwebui">OpenWebUI 파일 첨부</ToggleGroupItem>
+                  <ToggleGroupItem value="inline">텍스트로 붙이기</ToggleGroupItem>
+                </ToggleGroup>
+                <p className="text-[11px] text-muted-foreground">
+                  파일 첨부: 고른 입력 파일을 OpenWebUI Files API(<code>/api/v1/files/</code>)에 올려 채팅 요청에 첨부합니다. assistant가 자체 방식(RAG·워크플로우)으로 읽고, 같은 버전은 다시 올리지 않습니다. 올리기 실패 시 그 파일만 텍스트로 대신 붙이며 "전송 기록"에 남습니다.
+                  텍스트로 붙이기: 텍스트 파일 본문(최대 12,000자)을 프롬프트에 넣습니다(OpenAI 호환 서버·Mock).
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={save} disabled={!dirty}>

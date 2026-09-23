@@ -1,6 +1,6 @@
 import { db } from '@/db/schema'
 import type { Actor } from '@/db/repositories/activity'
-import { createAssistant } from '@/db/repositories/assistants'
+import { createAssistant, defaultChecklistTemplate } from '@/db/repositories/assistants'
 import { addTag, startConversation } from '@/db/repositories/tasks'
 import { normalizeTag } from '@/domain/tags'
 import type { Priority } from '@/domain/types'
@@ -78,7 +78,7 @@ export async function applyProposal(actor: Actor, p: ProposedAction): Promise<No
           ownerId: owner?.id ?? actor.userId,
           status: 'developing',
           usageExample: '',
-          checklistTemplate: [],
+          checklistTemplate: defaultChecklistTemplate(),
         })
         return { ok: true, message: `"${a.name}" 에이전트를 카탈로그 끝에 등록했습니다. 관리에서 모델·링크를 매핑하세요.`, link: '/assistants/manage' }
       }

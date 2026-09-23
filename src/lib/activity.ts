@@ -7,6 +7,8 @@ export function describeActivity(a: ActivityLog): string {
     case 'checklist.checked':
     case 'checklist.unchecked':
       return String(p.label ?? '')
+    case 'checklist.reviewed':
+      return `${String(p.met ?? 0)}/${String(p.total ?? 0)} 달성${p.source === 'rule' ? ' (규칙 판단)' : ''}`
     case 'file.uploaded':
     case 'file.tagged_output':
       return String(p.name ?? '')
@@ -28,7 +30,7 @@ export function describeActivity(a: ActivityLog): string {
     case 'task.reopened':
       return p.reason ? `사유: ${String(p.reason)}` : ''
     case 'task.completed':
-      return [Number(p.missingRequired ?? 0) > 0 ? `필수 체크 ${String(p.missingRequired)}건 누락` : '', p.reason ? `사유: ${String(p.reason)}` : '']
+      return [Number(p.missingRequired ?? 0) > 0 ? `중요 체크 ${String(p.missingRequired)}건 미체크` : '', p.reason ? `사유: ${String(p.reason)}` : '']
         .filter(Boolean)
         .join(' · ')
     case 'tag.added':

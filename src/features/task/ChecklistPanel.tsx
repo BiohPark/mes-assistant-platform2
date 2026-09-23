@@ -6,16 +6,19 @@ import { Input } from '@/components/ui/input'
 import { useActor, useUserMap } from '@/app/hooks'
 import { addChecklistItem, removeChecklistItem, toggleChecklist } from '@/db/repositories/tasks'
 import { checklistProgress, missingRequiredChecklist } from '@/domain/transitions'
-import type { Task } from '@/domain/types'
+import type { Assistant, Task } from '@/domain/types'
+import { ChecklistReviewCard } from './ChecklistReviewCard'
 import { formatDateTime } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 interface ChecklistPanelProps {
   task: Task
+  assistant: Assistant
   readOnly?: boolean
 }
 
-export function ChecklistPanel({ task, readOnly }: ChecklistPanelProps) {
+/** 체크리스트는 진행 기록용이다. 단계를 강제하지 않고, 필요할 때 AI 달성도(m/n)로 점검한다. */
+export function ChecklistPanel({ task, assistant, readOnly }: ChecklistPanelProps) {
   const actor = useActor()
   const users = useUserMap()
   const [adding, setAdding] = useState(false)
@@ -38,7 +41,7 @@ export function ChecklistPanel({ task, readOnly }: ChecklistPanelProps) {
           <span className="font-normal text-muted-foreground">
             {progress.done}/{progress.total}
           </span>
-          {missing > 0 && <span className="ml-1.5 rounded-full bg-red-50 px-1.5 text-[10px] font-normal text-red-600 dark:bg-red-950">필수 {missing} 남음</span>}
+          {missing > 0 && <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">중요 {missing}개 미체크</span>}
         </h3>
         {!readOnly && (
           <Button variant="ghost" size="xs" onClick={() => setAdding((v) => !v)}>
@@ -67,7 +70,7 @@ export function ChecklistPanel({ task, readOnly }: ChecklistPanelProps) {
               />
               <label htmlFor={c.id} className="min-w-0 flex-1 cursor-pointer text-xs leading-snug">
                 <span className={cn(c.checked && 'text-muted-foreground line-through')}>{c.label}</span>
-                {c.required && !c.checked && <span className="ml-1 text-[10px] text-red-500">필수</span>}
+                {c.required && !c.checked && <span className="ml-1 text-[10px] text-amber-600">중요</span>}
                 {c.checked && by && (
                   <span className="block text-[10px] text-muted-foreground">
                     {by.name} · {formatDateTime(c.checkedAt)}
@@ -87,7 +90,7 @@ export function ChecklistPanel({ task, readOnly }: ChecklistPanelProps) {
             </li>
           )
         })}
-        {task.checklist.length === 0 && <li className="px-1 text-xs text-muted-foreground">체크리스트가 없습니다.</li>}
+        {task.checklist.length === 0 && <li className="px-1 text-xs text-muted-foreground">체크리스트가 없습니다. 필요하면 항목을 추가하세요(선택).</li>}
       </ul>
       {adding && (
         <form
@@ -103,6 +106,7 @@ export function ChecklistPanel({ task, readOnly }: ChecklistPanelProps) {
           </Button>
         </form>
       )}
+      {task.checklist.length > 0 && <ChecklistReviewCard task={task} assistant={assistant} readOnly={readOnly} />}
     </section>
   )
 }

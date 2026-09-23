@@ -33,7 +33,7 @@ export function TaskBody({ data, initialMessage, onInitialSent }: TaskBodyProps)
     <ChatView scope={{ kind: 'task', task, assistant }} files={files} readOnly={readOnly} initialMessage={initialMessage} onInitialSent={onInitialSent} />
   )
   const materials = <MaterialsPanel data={data} readOnly={readOnly} />
-  const checklist = <ChecklistPanel task={task} readOnly={readOnly} />
+  const checklist = <ChecklistPanel task={task} assistant={assistant} readOnly={readOnly} />
   const notesPanel = <NotesPanel taskId={task.id} notes={notes} files={files} />
   const history = <ActivityPanel activity={activity} />
 

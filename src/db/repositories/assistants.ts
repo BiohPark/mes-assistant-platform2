@@ -18,7 +18,6 @@ export interface AssistantInput {
   ownerId: ID
   status: AssistantStatus
   usageExample: string
-  systemPromptHint?: string
   checklistTemplate: ChecklistTemplateItem[]
 }
 
@@ -31,6 +30,17 @@ async function isIntakeAssistant(id: ID): Promise<boolean> {
 
 export function newChecklistTemplateItem(label: string, required = false): ChecklistTemplateItem {
   return { id: newId('ct'), label, required }
+}
+
+/** 새 에이전트의 기본 체크리스트 (관리 페이지에서 바꾸거나 지울 수 있다) */
+const DEFAULT_CHECKLIST: Array<[label: string, required: boolean]> = [
+  ['입력 자료 선택', true],
+  ['결과 검토', true],
+  ['산출물 저장', false],
+]
+
+export function defaultChecklistTemplate(): ChecklistTemplateItem[] {
+  return DEFAULT_CHECKLIST.map(([label, required]) => newChecklistTemplateItem(label, required))
 }
 
 export async function createAssistant(actor: Actor, input: AssistantInput): Promise<Assistant> {

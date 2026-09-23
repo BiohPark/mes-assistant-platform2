@@ -36,7 +36,7 @@ function reportInputs(inputs: TaskInput[], pool: SharedPool, srFiles: FileAsset[
   })
 }
 
-/** 업무 완료: 필수 체크 경고(비차단) → 산출물 일괄 태그 → 피드백 → 리포트 저장 + done */
+/** 업무 완료: 중요 체크 안내(비차단) → 산출물 일괄 태그 → 피드백 → 리포트 저장 + done */
 export function TaskCompleteDialog({ open, onOpenChange, data }: TaskCompleteDialogProps) {
   const actor = useActor()
   const users = useUserMap()
@@ -73,7 +73,7 @@ export function TaskCompleteDialog({ open, onOpenChange, data }: TaskCompleteDia
         users,
       })
       await saveAssistantOutput(actor, task.id, reportName, report)
-      await setTaskStatus(actor, task.id, 'done', { missingRequired: missing.length, reason: missing.length ? reason.trim() : undefined })
+      await setTaskStatus(actor, task.id, 'done', { missingRequired: missing.length, reason: missing.length && reason.trim() ? reason.trim() : undefined })
       setSavedReport(report)
       toast.success('업무를 완료했습니다. 완료 리포트가 파일함에 저장되었습니다.')
     } finally {
@@ -109,8 +109,8 @@ export function TaskCompleteDialog({ open, onOpenChange, data }: TaskCompleteDia
           <>
             {missing.length > 0 && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                필수 체크리스트 {missing.length}건이 미완료입니다: {missing.map((c) => c.label).join(', ')} — 그대로 완료하려면 사유가 필요하며 리포트와 이력에 기록됩니다.
-                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="미완료 상태로 완료하는 사유 (필수)" className="mt-2 bg-background text-xs" />
+                중요 체크 {missing.length}건이 아직 체크되지 않았습니다: {missing.map((c) => c.label).join(', ')}. 그대로 완료해도 됩니다. 메모를 남기면 리포트와 이력에 기록됩니다.
+                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="메모 (선택)" className="mt-2 bg-background text-xs" />
               </div>
             )}
 
@@ -149,7 +149,7 @@ export function TaskCompleteDialog({ open, onOpenChange, data }: TaskCompleteDia
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
                 취소
               </Button>
-              <Button onClick={confirm} disabled={busy || !actor || (missing.length > 0 && !reason.trim())}>
+              <Button onClick={confirm} disabled={busy || !actor}>
                 완료 처리
               </Button>
             </DialogFooter>

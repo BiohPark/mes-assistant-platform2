@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .playwright-mcp/
+
+# 스크린샷·참고 이미지가 실수로 커밋되지 않도록 (공개 저장소)
+/*.png
+/*.jpg
+/*.jpeg

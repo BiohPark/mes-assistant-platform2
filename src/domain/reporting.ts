@@ -193,13 +193,13 @@ export interface InefficiencySignal {
 
 export const SIGNAL_LABEL: Record<SignalKind, string> = {
   reopen: '재오픈',
-  missing_required: '필수 체크 누락 완료',
+  missing_required: '중요 체크 미완료로 완료',
   long_task: '장기 진행',
   stale: '방치',
   outdated_input: '이전 버전 입력',
 }
 
-/** 비효율 신호: 재오픈, 필수 체크 누락 완료, 장기 업무(≥10일), 방치(≥5일 활동 없음), 새 버전이 나왔는데 이전 버전을 입력으로 쓰는 진행 중 대화 */
+/** 비효율 신호: 재오픈, 중요 체크 미완료로 완료, 장기 업무(≥10일), 방치(≥5일 활동 없음), 새 버전이 나왔는데 이전 버전을 입력으로 쓰는 진행 중 대화 */
 export function inefficiencySignals(tasks: Task[], activity: ActivityLog[], files: Pick<FileAsset, 'id' | 'name' | 'version' | 'previousId'>[], now = new Date()): InefficiencySignal[] {
   const out: InefficiencySignal[] = []
   const taskById = new Map(tasks.map((t) => [t.id, t]))
@@ -209,7 +209,7 @@ export function inefficiencySignals(tasks: Task[], activity: ActivityLog[], file
     const t = a.taskId ? taskById.get(a.taskId) : undefined
     if (!t) continue
     if (a.type === 'task.reopened') push('reopen', t, a.payload.reason ? `다시 열림: ${String(a.payload.reason)}` : '완료 후 다시 열림', a.at)
-    if (a.type === 'task.completed' && Number(a.payload.missingRequired ?? 0) > 0) push('missing_required', t, `필수 ${String(a.payload.missingRequired)}건 미완료 상태로 완료${a.payload.reason ? ` — ${String(a.payload.reason)}` : ''}`, a.at)
+    if (a.type === 'task.completed' && Number(a.payload.missingRequired ?? 0) > 0) push('missing_required', t, `중요 ${String(a.payload.missingRequired)}건 미체크 상태로 완료${a.payload.reason ? ` — ${String(a.payload.reason)}` : ''}`, a.at)
   }
 
   const lastActivity = new Map<string, string>()
