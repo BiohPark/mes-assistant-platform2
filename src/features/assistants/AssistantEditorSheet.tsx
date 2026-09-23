@@ -73,7 +73,16 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
   const isNew = !assistant
   const patch = (p: Partial<Form>) => setForm((f) => ({ ...f, ...p }))
   const level1Options = [...new Set(assistants.map((a) => a.level1))]
-  const canSave = form.id.trim() && form.name.trim() && form.level1.trim() && form.level2.trim() && form.ownerId
+  // 필수: ID·이름·Lv1·Lv2. 담당자는 비우면 저장 시 현재 사용자로 채운다(시트가 사용자 로딩 전에 열려도 막히지 않게)
+  const missing = [
+    [form.id.trim(), 'ID'],
+    [form.name.trim(), '이름'],
+    [form.level1.trim(), '업무 Lv1'],
+    [form.level2.trim(), '업무 Lv2'],
+  ]
+    .filter(([v]) => !v)
+    .map(([, label]) => label)
+  const canSave = missing.length === 0
 
   function updateChecklist(id: string, p: Partial<ChecklistTemplateItem>) {
     patch({ checklistTemplate: form.checklistTemplate.map((c) => (c.id === id ? { ...c, ...p } : c)) })
@@ -86,6 +95,8 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
       const input: AssistantInput = {
         ...form,
         id: form.id.trim(),
+        // 기존 에이전트의 "담당자 없음"은 그대로 둔다
+        ownerId: isNew ? form.ownerId || actor.userId : form.ownerId,
         docUrl: form.docUrl?.trim() || undefined,
         // 비우면 공통 기본 모델 (링크에서 추정하지 않음)
         modelId: form.modelId?.trim() || undefined,
@@ -203,7 +214,7 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
               <Label>담당자</Label>
               <Select value={form.ownerId} onValueChange={(v) => patch({ ownerId: v })}>
                 <SelectTrigger size="sm" className="w-full">
-                  <SelectValue placeholder="선택" />
+                  <SelectValue placeholder="비우면 나" />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((u) => (
@@ -291,7 +302,8 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
             ) : (
               <span />
             )}
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {missing.length > 0 && <span className="text-[11px] text-muted-foreground">필수 입력: {missing.join(', ')}</span>}
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
                 취소
               </Button>
