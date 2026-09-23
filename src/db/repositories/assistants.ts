@@ -32,6 +32,17 @@ export function newChecklistTemplateItem(label: string, required = false): Check
   return { id: newId('ct'), label, required }
 }
 
+/** 새 에이전트의 기본 체크리스트 (관리 페이지에서 바꾸거나 지울 수 있다) */
+const DEFAULT_CHECKLIST: Array<[label: string, required: boolean]> = [
+  ['입력 자료 선택', true],
+  ['결과 검토', true],
+  ['산출물 저장', false],
+]
+
+export function defaultChecklistTemplate(): ChecklistTemplateItem[] {
+  return DEFAULT_CHECKLIST.map(([label, required]) => newChecklistTemplateItem(label, required))
+}
+
 export async function createAssistant(actor: Actor, input: AssistantInput): Promise<Assistant> {
   const id = input.id.trim()
   if (!id) throw new Error('어시스턴트 ID(모델 ID)는 필수입니다.')

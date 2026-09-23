@@ -51,7 +51,7 @@ function ModelCell({ assistant, defaultModel }: { assistant: Assistant; defaultM
   )
 }
 
-/** 컬럼: 순서 · Lv1 · Lv2 · 이름 · 요약 · 모델 ID(매핑) · 링크1 · 링크2 · 담당자 · 상태 · 사용예시 */
+/** 컬럼: 순서 · Lv1 · Lv2 · 이름 · 요약 · 모델 ID(매핑) · 링크1 · 링크2 · 담당자 · 상태 · 체크리스트 · 사용예시 */
 export function AssistantTable({ assistants, baseUrl, models, defaultModel, onEdit }: AssistantTableProps) {
   const actor = useActor()
   const users = useUserMap()
@@ -82,6 +82,7 @@ export function AssistantTable({ assistants, baseUrl, models, defaultModel, onEd
             <TableHead>링크2</TableHead>
             <TableHead>담당자</TableHead>
             <TableHead>상태</TableHead>
+            <TableHead>체크리스트</TableHead>
             <TableHead>사용예시</TableHead>
           </TableRow>
         </TableHeader>
@@ -143,6 +144,30 @@ export function AssistantTable({ assistants, baseUrl, models, defaultModel, onEd
                     ))}
                   </SelectContent>
                 </Select>
+              </TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                {a.checklistTemplate.length ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button size="xs" variant="outline" title="행을 누르면 편집">
+                        {a.checklistTemplate.length}개
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-64">
+                      <ol className="list-decimal space-y-0.5 pl-4 text-xs">
+                        {a.checklistTemplate.map((c) => (
+                          <li key={c.id}>
+                            {c.label}
+                            {c.required && <span className="ml-1 text-[10px] text-amber-600">중요</span>}
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="mt-2 text-[10px] text-muted-foreground">행을 눌러 편집 시트에서 수정합니다.</p>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <span className="text-xs text-muted-foreground">-</span>
+                )}
               </TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
                 {a.usageExample ? (

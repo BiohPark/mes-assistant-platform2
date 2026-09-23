@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Markdown } from '@/components/Markdown'
 import { useActor, useAssistants, useSettings, useUsers } from '@/app/hooks'
-import { createAssistant, deleteAssistant, newChecklistTemplateItem, setAssistantImage, updateAssistant, type AssistantInput } from '@/db/repositories/assistants'
+import { createAssistant, defaultChecklistTemplate, deleteAssistant, newChecklistTemplateItem, setAssistantImage, updateAssistant, type AssistantInput } from '@/db/repositories/assistants'
 import { useModelList } from '@/llm/useModelList'
 import { assistantLink1 } from '@/lib/links'
 import { ASSISTANT_STATUS_LABEL } from '@/lib/labels'
@@ -29,7 +29,7 @@ interface AssistantEditorSheetProps {
 type Form = AssistantInput
 
 function emptyForm(ownerId: string): Form {
-  return { id: '', name: '', level1: '', level2: '', summary: '', docUrl: '', modelId: '', link1: '', expectedInputs: [], expectedOutputs: [], ownerId, status: 'developing', usageExample: '', checklistTemplate: [] }
+  return { id: '', name: '', level1: '', level2: '', summary: '', docUrl: '', modelId: '', link1: '', expectedInputs: [], expectedOutputs: [], ownerId, status: 'developing', usageExample: '', checklistTemplate: defaultChecklistTemplate() }
 }
 
 /** "a, b ,, c" → ['a','b','c'] */
@@ -83,6 +83,15 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
     .filter(([v]) => !v)
     .map(([, label]) => label)
   const canSave = missing.length === 0
+
+  function moveChecklist(id: string, step: -1 | 1) {
+    const list = [...form.checklistTemplate]
+    const i = list.findIndex((c) => c.id === id)
+    const j = i + step
+    if (i < 0 || j < 0 || j >= list.length) return
+    ;[list[i], list[j]] = [list[j], list[i]]
+    patch({ checklistTemplate: list })
+  }
 
   function updateChecklist(id: string, p: Partial<ChecklistTemplateItem>) {
     patch({ checklistTemplate: form.checklistTemplate.map((c) => (c.id === id ? { ...c, ...p } : c)) })
@@ -255,20 +264,33 @@ export function AssistantEditorSheet({ open, onOpenChange, assistant }: Assistan
 
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
-              <Label>체크리스트 템플릿 (선택 · 강제 아님)</Label>
-              <Button type="button" size="xs" variant="ghost" onClick={() => patch({ checklistTemplate: [...form.checklistTemplate, newChecklistTemplateItem('')] })}>
-                <Plus data-icon="inline-start" />
-                항목
-              </Button>
+              <Label>체크리스트 (기본값 · 강제 아님)</Label>
+              <div className="flex gap-0.5">
+                <Button type="button" size="xs" variant="ghost" onClick={() => patch({ checklistTemplate: defaultChecklistTemplate() })} title="공통 기본 항목으로 되돌리기">
+                  <RotateCcw data-icon="inline-start" />
+                  기본값
+                </Button>
+                <Button type="button" size="xs" variant="ghost" onClick={() => patch({ checklistTemplate: [...form.checklistTemplate, newChecklistTemplateItem('')] })}>
+                  <Plus data-icon="inline-start" />
+                  항목
+                </Button>
+              </div>
             </div>
-            {form.checklistTemplate.length === 0 && <div className="text-xs text-muted-foreground">새 대화에 자동으로 복사될 체크 항목이 없습니다.</div>}
-            {form.checklistTemplate.map((c) => (
+            <p className="text-[11px] text-muted-foreground">새 대화를 시작할 때 복사됩니다. 이미 진행 중인 대화는 바뀌지 않으며, 대화 화면에서 항목을 따로 더하거나 뺄 수 있습니다.</p>
+            {form.checklistTemplate.length === 0 && <div className="text-xs text-muted-foreground">새 대화에 복사될 체크 항목이 없습니다.</div>}
+            {form.checklistTemplate.map((c, i) => (
               <div key={c.id} className="flex items-center gap-2">
                 <Input value={c.label} onChange={(e) => updateChecklist(c.id, { label: e.target.value })} className="h-8" placeholder="항목" />
                 <label className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                   <Switch checked={c.required} onCheckedChange={(v) => updateChecklist(c.id, { required: v })} /> 중요
                 </label>
-                <Button type="button" size="icon-xs" variant="ghost" onClick={() => patch({ checklistTemplate: form.checklistTemplate.filter((x) => x.id !== c.id) })}>
+                <Button type="button" size="icon-xs" variant="ghost" aria-label="위로" disabled={i === 0} onClick={() => moveChecklist(c.id, -1)}>
+                  <ArrowUp />
+                </Button>
+                <Button type="button" size="icon-xs" variant="ghost" aria-label="아래로" disabled={i === form.checklistTemplate.length - 1} onClick={() => moveChecklist(c.id, 1)}>
+                  <ArrowDown />
+                </Button>
+                <Button type="button" size="icon-xs" variant="ghost" aria-label="항목 삭제" onClick={() => patch({ checklistTemplate: form.checklistTemplate.filter((x) => x.id !== c.id) })}>
                   <Trash2 />
                 </Button>
               </div>

@@ -5,6 +5,8 @@ import { pickColor } from '@/lib/colors'
 // 사내 OpenWebUI 설정에 맞게 바꿔 쓴다. 모델 ID는 모두 비워 두어 설정의 공통 기본 모델을 쓴다.
 // 링크1도 비워 두면 설정의 OpenWebUI 주소 + `?model={모델 ID}` 로 만들어진다.
 // 질문 흐름·역할 같은 워크플로우는 각 assistant(OpenWebUI) 안에 있고, 여기에는 안내 문구만 둔다.
+// 체크리스트는 기본값일 뿐이며 관리 페이지에서 에이전트별로 수정한다(새 대화에만 복사, 강제 아님).
+// 체크리스트는 기본값일 뿐이며 관리 페이지에서 에이전트별로 수정한다(새 대화에만 복사, 강제 아님).
 
 const T = '2026-09-01T00:00:00.000Z'
 
@@ -37,6 +39,7 @@ const SPECS: Spec[] = [
     summary: '일탈 보고서 섹션별 초안 작성과 작성본 검토를 돕습니다.',
     ownerId: 'u_dev2',
     status: 'open',
+    checklist: [['발생 개요·일시 기재', true], ['즉시 조치 기재', true], ['영향 평가 작성', false], ['근본 원인·CAPA 초안', false]],
     usage: [START, '작성 또는 검토 중 하나를 고릅니다.', '작성: 섹션을 고르면 들어가야 할 내용과 예시를 보여 주고 필요한 정보를 묻습니다.', '검토: 작성한 내용을 붙여 넣으면 누락·모호한 표현을 짚어 줍니다.'],
     outputs: ['Deviation 섹션별 초안'],
   },
@@ -48,6 +51,7 @@ const SPECS: Spec[] = [
     summary: 'CC Item 목록을 바탕으로 변경 관리 문서의 주요 섹션을 작성합니다.',
     ownerId: 'u_dev1',
     status: 'open',
+    checklist: [['CC Item 목록을 입력으로 선택', true], ['변경 사유·범위 기재', true], ['위험 평가 작성', false], ['실행 계획 작성', false]],
     usage: [START, 'CC Item 분해 도우미의 산출물을 입력으로 선택하면 섹션 작성에 반영됩니다.', '질문에 답하면 배경·변경 내용·위험 평가·실행 계획 순으로 초안을 만듭니다.'],
     inputs: ['CC Item 목록', '대상 설비/시스템 식별자', '관련 위험 평가 목록'],
     outputs: ['CC 문서 초안 (배경 · 변경 내용 · 위험 평가 · 실행 계획)'],
@@ -60,6 +64,7 @@ const SPECS: Spec[] = [
     summary: '변경 요청을 부서·시스템별 실행 Item 표로 나눕니다.',
     ownerId: 'u_dev1',
     status: 'open',
+    checklist: [['부서·시스템별 Item 분해', true], ['Item별 담당 지정', false], ['Item 표 산출물 저장', true]],
     usage: [START, '질문에 답하면 Item 표가 만들어집니다.', '표를 산출물로 저장해 CC 작성 대화의 입력으로 쓰세요.'],
     outputs: ['CC Item 표'],
   },
@@ -71,6 +76,7 @@ const SPECS: Spec[] = [
     summary: '운영 환경 배포용 Release CCA 문안을 만듭니다.',
     ownerId: 'u_dev3',
     status: 'open',
+    checklist: [['배포 대상·환경 확인', true], ['롤백 계획 기재', true], ['QA 검토 요청', false]],
     usage: [START, '배포 대상·환경·일정·롤백 계획 등을 차례로 묻습니다.', '부족한 정보는 추가로 질문합니다.', '결과를 확인한 뒤 QA 검토를 요청하세요.'],
     outputs: ['Release CCA 문안'],
   },
@@ -82,6 +88,7 @@ const SPECS: Spec[] = [
     summary: '요청 사항을 기본 URS 표 형식으로 정리합니다.',
     ownerId: 'u_dev1',
     status: 'developing',
+    checklist: [['대상 식별자 확인', true], ['URS 표 작성', true], ['요청자 확인', false]],
     inputs: ['대상 설비/화면 식별자', '추가·변경하려는 항목'],
     outputs: ['URS 표 (ID · 대상 · 요구사항 · 우선순위)'],
   },
@@ -93,12 +100,9 @@ const SPECS: Spec[] = [
     summary: '현업 요청을 대화로 구체화해 URS 항목과 변경 범위를 도출합니다. SR 접수에도 쓰입니다.',
     ownerId: 'u_dev4',
     status: 'testing',
+    checklist: [['변경 범위 확정', true], ['URS 표 작성', true], ['GxP 영향 표시', false], ['요청자 확인', false]],
     inputs: ['대상 설비/화면 식별자', '추가·변경하려는 항목'],
     outputs: ['URS 표 (ID · 대상 · 요구사항 · 우선순위 · GxP)'],
-    checklist: [
-      ['변경 범위 확정', true],
-      ['요청자 확인', false],
-    ],
   },
   {
     id: 'fds-writer',
@@ -108,6 +112,7 @@ const SPECS: Spec[] = [
     summary: '확정된 URS를 기준으로 수정이 필요한 FDS 섹션과 내용을 정리합니다.',
     ownerId: '',
     status: 'developing',
+    checklist: [['URS를 주 입력으로 선택', true], ['변경 대상 섹션 도출', true], ['URS 추적성 표 작성', false], ['FDS 산출물 저장', false]],
     inputs: ['URS', '개정 전 FDS'],
     outputs: ['FDS 변경 항목 표'],
   },
@@ -119,6 +124,7 @@ const SPECS: Spec[] = [
     summary: '변경 전후 FDS와 변경 요청을 비교해 누락·과잉 반영을 점검합니다.',
     ownerId: 'u_dev1',
     status: 'developing',
+    checklist: [['개정 전·후 FDS 선택', true], ['누락 반영 점검', true], ['불필요 반영 점검', false]],
     inputs: ['FDS 변경 항목', '개정 전 FDS', '개정 후 FDS'],
     outputs: ['반영 누락·불필요 반영 점검표'],
   },
@@ -130,6 +136,7 @@ const SPECS: Spec[] = [
     summary: '설계 변경 내용을 바탕으로 단위·통합·회귀 테스트 시나리오를 제안합니다.',
     ownerId: 'u_dev3',
     status: 'developing',
+    checklist: [['기준 FDS 선택', true], ['단위·통합 시나리오', true], ['회귀 시나리오', false], ['사전 조건 기재', false]],
     inputs: ['개정 전 FDS', '개정 후 FDS'],
     outputs: ['테스트 시나리오 (No · FDS 섹션 · 목표 · 방법 · 사전 조건)'],
   },
@@ -141,6 +148,7 @@ const SPECS: Spec[] = [
     summary: '배포 후 설계 문서와 실제 DB/설정을 비교해 반영 상태를 확인합니다.',
     ownerId: 'u_dev3',
     status: 'developing',
+    checklist: [['배포 대상 목록 확인', true], ['FDS 대비 DB·설정 비교', true], ['확인표 산출물 저장', false]],
     inputs: ['배포 대상 목록', 'FDS'],
     outputs: ['반영 누락·불필요 반영 확인표'],
   },
@@ -152,6 +160,7 @@ const SPECS: Spec[] = [
     summary: '배포 Item별 CCA에 들어갈 문장을 만듭니다.',
     ownerId: 'u_dev3',
     status: 'testing',
+    checklist: [['배포 Item 확인', true], ['CCA 문장 검토', false]],
     usage: [START, '생성된 문장을 검토한 뒤 CCA 문서에 옮겨 쓰세요.'],
     outputs: ['CCA 문장'],
   },
@@ -163,6 +172,7 @@ const SPECS: Spec[] = [
     summary: '밸리데이션 프로토콜과 설계 문서를 비교해 적합성을 점검합니다.',
     ownerId: '',
     status: 'developing',
+    checklist: [['프로토콜·설계 문서 선택', true], ['적합성 점검', true], ['수정 필요 항목 정리', false]],
     inputs: ['개정 전 FDS', '개정 후 FDS', '밸리데이션 프로토콜'],
     outputs: ['프로토콜 수정 필요 항목'],
   },
