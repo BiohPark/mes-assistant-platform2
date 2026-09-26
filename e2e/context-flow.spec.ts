@@ -11,7 +11,7 @@ const LIVE_INLINE = { mode: 'live' as const, baseUrl: FAKE_BASE_URL, apiKey: 'e2
 const LIVE_OWUI = { ...LIVE_INLINE, fileDelivery: 'openwebui' as const }
 
 /** E1 기준선에서 재현된 결함. 고친 커밋에서 해당 ID를 지운다 */
-const KNOWN_DEFECTS = new Set(['S1', 'S2', 'S3', 'S5', 'S6', 'S7', 'S8'])
+const KNOWN_DEFECTS = new Set<string>([])
 const expectDefect = (id: string) => test.fail(KNOWN_DEFECTS.has(id), `${id}: E1 기준선 결함(수정 전)`)
 
 const systemOf = (body: { messages: Array<{ role: string; content: string }> }) => body.messages.find((m) => m.role === 'system')?.content ?? ''

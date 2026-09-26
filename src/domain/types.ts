@@ -76,12 +76,57 @@ export interface Feedback {
   at: ISODate
 }
 
+/** 입력 등급: ★ 주 입력 / ☑ 참고 */
+export type InputWeight = 'main' | 'reference'
+
 /** 대화에서 선택한 입력. 특정 파일 버전 ID를 고정하며 새 버전이 생겨도 자동 교체하지 않는다. */
 export interface TaskInput {
   fileId: ID
-  weight: 'main' | 'reference'
+  weight: InputWeight
   selectedAt: ISODate
   selectedBy: ID
+}
+
+/** 참조 대화 전달 범위: 전체 원문 / 고른 메시지 / 사람이 확인한 요약 */
+export type ContextMode = 'full' | 'messages' | 'summary'
+
+/**
+ * 다른 대화를 AI 입력으로 고른 것 (파일 선택과 같은 규칙).
+ * 같은 태그를 **직접** 공유하는 대화만 고를 수 있고, 선택 시점 스냅샷에 고정된다.
+ * 참조 대화가 쓴 파일·다른 참조는 따라가지 않는다(재귀 수집 없음).
+ */
+export interface ConversationInput {
+  id: ID
+  /** 이 입력을 쓰는 대화 */
+  taskId: ID
+  /** 참조하는 대화 */
+  sourceTaskId: ID
+  weight: InputWeight
+  mode: ContextMode
+  snapshotId: ID
+  selectedAt: ISODate
+  selectedBy: ID
+}
+
+/**
+ * 참조 대화의 선택 시점 고정본. 불변 — 갱신하면 새 스냅샷을 만든다.
+ * 완료된 메시지는 바뀌지 않으므로 원문은 복사하지 않고 메시지 ID만 남긴다.
+ */
+export interface ContextSnapshot {
+  id: ID
+  sourceTaskId: ID
+  mode: ContextMode
+  /** full·messages: 전달할 메시지 ID (시간순) */
+  messageIds: ID[]
+  /** 선택 시점의 마지막 적격 메시지 — 이후 메시지는 "새 메시지"로 안내 */
+  upToMessageId?: ID
+  upToCreatedAt?: ISODate
+  /** summary: 사람이 확인·수정해 적용한 요약 본문 */
+  summaryText?: string
+  summarySource?: 'ai' | 'rule'
+  summaryModel?: string
+  createdBy: ID
+  createdAt: ISODate
 }
 
 export type TitleSource = 'default' | 'ai' | 'manual'
@@ -156,6 +201,58 @@ export interface Thread {
 export type MessageRole = 'system' | 'user' | 'assistant'
 export type MessageStatus = 'streaming' | 'done' | 'error'
 
+/** 입력이 AI에 실제로 전달된 방식 */
+export type InputDelivery = 'attached' | 'inline' | 'metadata_only' | 'failed'
+
+export interface FileRequestInput {
+  kind: 'file'
+  fileId: ID
+  name: string
+  version: number
+  weight: InputWeight
+  /** 출처 표기 (예: "WK-2026-0001 · URS 분석 도우미", "이 대화", "SR 첨부") */
+  source?: string
+  /** 이번 메시지에만 붙인 첨부 (대화 입력으로 고정하지 않음) */
+  oneShot?: boolean
+  delivery: InputDelivery
+  /** 텍스트 파일 여부 (실패 시 "텍스트로 보내기" 가능) */
+  text: boolean
+  /** OpenWebUI에 올린 파일 ID (감사용 기록. 재사용 캐시와 별개) */
+  remoteId?: string
+  bytes: number
+  error?: string
+}
+
+export interface ConversationRequestInput {
+  kind: 'conversation'
+  sourceTaskId: ID
+  code: string
+  title: string
+  assistantName: string
+  weight: InputWeight
+  mode: ContextMode
+  snapshotId: ID
+  messageCount: number
+  bytes: number
+}
+
+export type RequestInput = FileRequestInput | ConversationRequestInput
+
+/** 답변 1건을 만들 때 AI에 실제로 보낸 것 — 화면의 "사용한 자료"와 전송 기록 뷰어가 읽는다 */
+export interface RequestInfo {
+  at: ISODate
+  provider: 'mock' | 'live'
+  transport: 'inline' | 'openwebui'
+  model: string
+  /** 직렬화한 요청 본문 크기 (OpenWebUI 첨부 파일의 바이트는 제외) */
+  bytes: number
+  limitBytes: number
+  inputs: RequestInput[]
+  srCodes: string[]
+  /** 다시 시도한 이전 답변 */
+  retryOf?: ID
+}
+
 export interface Message {
   id: ID
   threadId: ID
@@ -170,6 +267,12 @@ export interface Message {
   kind?: 'discussion'
   /** assistant 메시지: 실제로 전송한 요청 본문(JSON, API 키 제외). 감사·디버깅용 */
   requestSnapshot?: string
+  /** assistant 메시지: 구조화된 전송 기록 (사용한 자료·전달 방식·크기) */
+  requestInfo?: RequestInfo
+  /** 응답 중인 자리표시의 생존 신호. 오래 갱신되지 않으면 끊긴 요청으로 정리한다 */
+  heartbeatAt?: ISODate
+  /** 응답을 요청한 사용자 (자리표시·답변에 기록) */
+  requestedBy?: ID
 }
 
 export type FileSource = 'upload' | 'assistant' | 'sr'
@@ -250,6 +353,9 @@ export type ActivityType =
   | 'file.tagged_output'
   | 'input.selected'
   | 'input.removed'
+  | 'context.selected'
+  | 'context.removed'
+  | 'context.refreshed'
   | 'note.added'
   | 'message.sent'
   | 'thread.created'
@@ -298,6 +404,8 @@ export interface Settings {
   /** SR 접수 대화에 쓰는 에이전트 (기본: URS 분석 도우미) */
   srIntakeAssistantId?: ID
   llm: LlmSettings
+  /** 요청 본문 크기 한도(바이트). 없으면 DEFAULT_REQUEST_BUDGET_BYTES. 모델 토큰 한도와는 다르다 */
+  requestBudgetBytes?: number
 }
 
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {

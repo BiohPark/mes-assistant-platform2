@@ -13,10 +13,11 @@ export interface MockContext {
 
 type ScenarioFn = (ctx: MockContext) => string
 
+/** 입력이 있으면 답변 앞의 "사용한 자료" 블록(mockProvider)이 보여 주므로 여기서는 없을 때만 안내한다 */
 const inputsLine = (ctx: MockContext) =>
   ctx.inputFileNames.length
-    ? `AI 입력 ${ctx.inputFileNames.length}건(${ctx.inputFileNames.join(', ')})을 확인했습니다.`
-    : '선택된 입력이 없어 대화 내용만으로 진행합니다. 자료 패널의 공유 자료함에서 체크(참고) 또는 ★(주 입력)로 고르면 반영됩니다.'
+    ? '선택한 자료를 참고했습니다.'
+    : '선택된 입력이 없어 대화 내용만으로 진행합니다. 자료 패널에서 파일이나 같은 태그의 대화를 체크(참고) 또는 ★(주 입력)로 고르면 반영됩니다.'
 
 const URS: ScenarioFn[] = [
   (ctx) => `${inputsLine(ctx)}

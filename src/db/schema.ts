@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable, type Transaction } from 'dexie'
-import type { ActivityLog, Assistant, FileAsset, Message, Note, Notification, ServiceRequest, Settings, Task, Thread, User } from '@/domain/types'
+import type { ActivityLog, Assistant, ContextSnapshot, ConversationInput, FileAsset, Message, Note, Notification, ServiceRequest, Settings, Task, Thread, User } from '@/domain/types'
 import { migrateToConversationHub } from './migrations/v3'
 
 export class AppDB extends Dexie {
@@ -14,6 +14,8 @@ export class AppDB extends Dexie {
   serviceRequests!: EntityTable<ServiceRequest, 'id'>
   activity!: EntityTable<ActivityLog, 'id'>
   settings!: EntityTable<Settings, 'id'>
+  conversationInputs!: EntityTable<ConversationInput, 'id'>
+  contextSnapshots!: EntityTable<ContextSnapshot, 'id'>
 
   constructor(name = 'mes-assistant-hub') {
     super(name)
@@ -45,6 +47,12 @@ export class AppDB extends Dexie {
         packageReceipts: null,
       })
       .upgrade((tx: Transaction) => migrateToConversationHub(tx))
+    // v4: 같은 태그 대화를 입력으로 선택(대화 입력 + 선택 시점 스냅샷), 응답 중 메시지 조회용 status 인덱스
+    this.version(4).stores({
+      messages: 'id, threadId, createdAt, status',
+      conversationInputs: 'id, taskId, sourceTaskId, &[taskId+sourceTaskId]',
+      contextSnapshots: 'id, sourceTaskId',
+    })
   }
 }
 
@@ -62,5 +70,7 @@ export const TABLE_NAMES = [
   'serviceRequests',
   'activity',
   'settings',
+  'conversationInputs',
+  'contextSnapshots',
 ] as const
 export type TableName = (typeof TABLE_NAMES)[number]

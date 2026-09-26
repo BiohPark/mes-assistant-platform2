@@ -30,7 +30,7 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
   const users = useUserMap()
   const chat = useChat(actor, scope)
   const typingIds = useTypingUsers(chat.thread?.id, actor?.userId)
-  const remoteStreaming = !chat.streaming && chat.messages.some((m) => m.status === 'streaming')
+  const { remoteStreaming } = chat
   const participantIds = Array.from(new Set(chat.messages.filter((m) => m.role === 'user' && m.authorId).map((m) => m.authorId!)))
   const [saveTarget, setSaveTarget] = useState<Message | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -38,7 +38,6 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
   const assistant = scope.kind === 'task' ? scope.assistant : scope.intake
   const task = scope.kind === 'task' ? scope.task : undefined
   const fileMap = new Map((scope.kind === 'task' ? files : scope.files).map((f) => [f.id, f]))
-  const outputCount = task ? task.outputFileIds.length : 0
   const suggestions = scope.kind === 'sr' ? SR_SUGGESTIONS : suggestionsFrom(assistant.usageExample)
 
   // 초안 → 대화 전환: 첫 메시지를 한 번만 보낸다 (StrictMode 재실행에도 ref로 막음)
@@ -138,7 +137,7 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
           suggestions={chat.messages.length === 0 ? suggestions : undefined}
         />
       )}
-      {task && saveTarget && <SaveAsOutputDialog key={saveTarget.id} message={saveTarget} task={task} assistant={assistant} existingCount={outputCount} onClose={() => setSaveTarget(null)} />}
+      {task && saveTarget && <SaveAsOutputDialog key={saveTarget.id} message={saveTarget} task={task} assistant={assistant} onClose={() => setSaveTarget(null)} />}
     </div>
   )
 }

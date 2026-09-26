@@ -21,6 +21,13 @@ export function describeActivity(a: ActivityLog): string {
       return `${String(p.name ?? '')} v${String(p.version ?? 1)} · ${p.weight === 'main' ? '주 입력' : '참고'}`
     case 'input.removed':
       return `${String(p.name ?? '')} v${String(p.version ?? 1)}`
+    case 'context.selected':
+    case 'context.refreshed': {
+      const scope = p.mode === 'summary' ? '요약' : p.mode === 'messages' ? `고른 메시지 ${String(p.messages ?? 0)}개` : `전체 ${String(p.messages ?? 0)}개`
+      return [String(p.code ?? ''), p.messages !== undefined ? scope : '', p.weight === 'main' ? '주 입력' : p.weight ? '참고' : ''].filter(Boolean).join(' · ')
+    }
+    case 'context.removed':
+      return String(p.code ?? '')
     case 'thread.created':
       return String(p.title ?? '')
     case 'feedback.given':

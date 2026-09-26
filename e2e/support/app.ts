@@ -5,6 +5,8 @@ import { expect, type Page } from '@playwright/test'
  * 코드 문자열로 넘겨 테스트 변환기가 dynamic import를 바꾸지 않게 한다.
  */
 export async function inApp<T>(page: Page, code: string, arg?: unknown): Promise<T> {
+  // 테스트 전용: 앱 모듈을 브라우저에서 dynamic import 하려고 코드 문자열을 평가한다
+  // oxlint-disable-next-line no-eval
   return page.evaluate(({ code, arg }) => (0, eval)(code)(arg), { code, arg }) as Promise<T>
 }
 

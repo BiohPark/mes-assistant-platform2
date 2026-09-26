@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { db } from '../schema'
 import { logActivity, type Actor } from './activity'
 import { notify } from './notifications'
+import { ActiveRequestError, assertNoActiveReply } from './chat'
 import { newId, nowIso } from '@/lib/ids'
 import { applyTaskStatus, toggleChecklistItem } from '@/domain/transitions'
 import { isSrTag, normalizeTag, tagKey } from '@/domain/tags'
@@ -137,12 +138,18 @@ export async function removeTag(actor: Actor, taskId: ID, tag: string): Promise<
   })
 }
 
+/** 완료 잠금: 완료된 대화의 입력·자료 구성은 재개한 뒤에만 바꾼다 (UI 비활성화만으로는 부족) */
+export function assertNotDone(task: Pick<Task, 'status'>): void {
+  if (task.status === 'done') throw new Error('완료된 대화는 바꿀 수 없습니다. 재개한 뒤 진행하세요.')
+}
+
 /** 입력 선택/등급 변경. weight=null이면 선택 해제. 특정 버전 ID를 고정한다. */
 export async function setInput(actor: Actor, taskId: ID, fileId: ID, weight: TaskInput['weight'] | null): Promise<void> {
   await db.transaction('rw', db.tasks, db.files, db.activity, async () => {
     const task = await db.tasks.get(taskId)
     const file = await db.files.get(fileId)
     if (!task || !file) return
+    assertNotDone(task)
     const rest = task.inputs.filter((i) => i.fileId !== fileId)
     const inputs = weight ? [...rest, { fileId, weight, selectedAt: nowIso(), selectedBy: actor.userId }] : rest
     await db.tasks.put({ ...task, inputs })
@@ -157,6 +164,7 @@ export async function switchInputVersion(actor: Actor, taskId: ID, fromFileId: I
     const to = await db.files.get(toFileId)
     const cur = task?.inputs.find((i) => i.fileId === fromFileId)
     if (!task || !to || !cur) return
+    assertNotDone(task)
     const inputs = task.inputs.map((i) => (i.fileId === fromFileId ? { ...i, fileId: toFileId, selectedAt: nowIso(), selectedBy: actor.userId } : i))
     await db.tasks.put({ ...task, inputs })
     await logActivity(actor, { taskId }, 'input.selected', { name: to.name, version: to.version, weight: cur.weight })
@@ -171,9 +179,15 @@ const STATUS_ACTIVITY: Record<TaskStatus, 'task.started' | 'task.completed' | 't
 }
 
 export async function setTaskStatus(actor: Actor, taskId: ID, status: TaskStatus, payload: Record<string, unknown> = {}): Promise<void> {
-  await db.transaction('rw', db.tasks, db.activity, async () => {
+  await db.transaction('rw', db.tasks, db.activity, db.messages, async () => {
     const task = await db.tasks.get(taskId)
     if (!task || task.status === status) return
+    if (status === 'done') {
+      // 응답을 기다리는 중에 완료하면 완료 뒤에 답변이 도착해 기록이 어긋난다
+      await assertNoActiveReply(task.threadId).catch((e: unknown) => {
+        throw e instanceof ActiveRequestError ? new ActiveRequestError('응답을 기다리는 중에는 완료할 수 없습니다. 응답이 끝나거나 중지한 뒤 완료하세요.') : e
+      })
+    }
     await db.tasks.put({ ...applyTaskStatus(task, status, actor.userId, nowIso()), lastActivityAt: nowIso() })
     const type = task.status === 'done' && status !== 'done' ? 'task.reopened' : STATUS_ACTIVITY[status]
     await logActivity(actor, { taskId, assistantId: task.assistantId }, type, { from: task.status, to: status, ...payload })
@@ -250,19 +264,30 @@ export async function setThreadModel(actor: Actor, threadId: ID, modelId: string
   })
 }
 
-/** 업무 삭제: 스레드/메시지/노트/이 업무에서 만든 파일 정리. 다른 대화가 입력으로 쓰는 파일이 있으면 거부. */
+/**
+ * 업무 삭제: 스레드/메시지/노트/이 업무에서 만든 파일·대화 입력 정리.
+ * 다른 대화가 이 대화의 파일이나 대화 자체를 입력으로 쓰고 있으면 거부.
+ */
 export async function deleteTask(taskId: ID): Promise<{ ok: boolean; reason?: string }> {
-  return db.transaction('rw', [db.tasks, db.threads, db.messages, db.notes, db.files], async () => {
+  const tables = [db.tasks, db.threads, db.messages, db.notes, db.files, db.conversationInputs, db.contextSnapshots]
+  return db.transaction('rw', tables, async () => {
     const ownFileIds = new Set((await db.files.where('originTaskId').equals(taskId).toArray()).map((f) => f.id))
-    const users = (await db.tasks.toArray()).filter((t) => t.id !== taskId && t.inputs.some((i) => ownFileIds.has(i.fileId)))
-    if (users.length > 0) {
-      return { ok: false, reason: `이 대화의 파일을 ${users.map((u) => u.code).join(', ')}에서 입력으로 사용 중이라 삭제할 수 없습니다.` }
+    const fileUsers = (await db.tasks.toArray()).filter((t) => t.id !== taskId && t.inputs.some((i) => ownFileIds.has(i.fileId)))
+    if (fileUsers.length > 0) {
+      return { ok: false, reason: `이 대화의 파일을 ${fileUsers.map((u) => u.code).join(', ')}에서 입력으로 사용 중이라 삭제할 수 없습니다.` }
+    }
+    const refs = (await db.conversationInputs.where('sourceTaskId').equals(taskId).toArray()).filter((r) => r.taskId !== taskId)
+    if (refs.length > 0) {
+      const codes = (await db.tasks.bulkGet(refs.map((r) => r.taskId))).map((t) => t?.code ?? '?')
+      return { ok: false, reason: `이 대화를 ${codes.join(', ')}에서 참조 대화로 사용 중이라 삭제할 수 없습니다.` }
     }
     const threads = await db.threads.where('taskId').equals(taskId).toArray()
     for (const t of threads) await db.messages.where('threadId').equals(t.id).delete()
     await db.threads.where('taskId').equals(taskId).delete()
     await db.notes.where('taskId').equals(taskId).delete()
     await db.files.where('originTaskId').equals(taskId).delete()
+    await db.conversationInputs.where('taskId').equals(taskId).delete()
+    await db.contextSnapshots.where('sourceTaskId').equals(taskId).delete()
     await db.tasks.delete(taskId)
     return { ok: true }
   })

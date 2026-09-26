@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { INJECTION_GUARD, PLATFORM_CONTEXT_NOTE, buildSrSystemPrompt, buildTaskSystemPrompt, toChatMessages } from './context'
+import { INJECTION_GUARD, PLATFORM_CONTEXT_NOTE, buildSrSystemPrompt, buildTaskSystemPrompt, toChatMessages, type PromptConversation } from './context'
 import type { Assistant, FileAsset, ServiceRequest, Task } from '@/domain/types'
 
 const assistant = {
@@ -159,5 +159,60 @@ describe('discussion messages', () => {
     ]
     const out = toChatMessages('sys', msgs)
     expect(out.map((m) => m.content)).toEqual(['sys', 'AI에게'])
+  })
+})
+
+describe('no silent truncation', () => {
+  it('inlines long text inputs and SR bodies in full', async () => {
+    const long = 'A'.repeat(15_000) + 'END-OF-FILE'
+    const sr = { code: 'SR-2026-0002', title: 't', body: 'B'.repeat(5_000) + 'END-OF-SR' } as ServiceRequest
+    const p = await buildTaskSystemPrompt({ assistant, task, linkedSrs: [sr], inputs: [{ file: file('long.md', long), weight: 'main' }] })
+    expect(p).toContain('END-OF-FILE')
+    expect(p).toContain('END-OF-SR')
+  })
+
+  it('states when a binary input is sent as metadata only', async () => {
+    const bin = { ...file('scan.pdf', ''), mime: 'application/pdf' }
+    const p = await buildTaskSystemPrompt({ assistant, task, linkedSrs: [], inputs: [{ file: bin, weight: 'reference' }] })
+    expect(p).toContain('scan.pdf')
+    expect(p).toContain('본문은 전달되지 않음')
+  })
+})
+
+describe('referenced conversations', () => {
+  const conv = (code: string, weight: 'main' | 'reference', extra: Partial<PromptConversation> = {}): PromptConversation => ({
+    weight,
+    code,
+    title: `${code} 제목`,
+    assistantName: 'URS 분석 도우미',
+    mode: 'full',
+    selectedAt: '2026-09-26T01:00:00.000Z',
+    messages: [
+      { role: 'user', author: '박', content: `${code} 질문` },
+      { role: 'assistant', content: `${code} 답변` },
+    ],
+    ...extra,
+  })
+
+  it('renders each conversation as reference data after the guard, main first, with speaker labels', async () => {
+    const p = await buildTaskSystemPrompt({ assistant, task, linkedSrs: [], inputs: [], conversations: [conv('WK-1', 'reference'), conv('WK-2', 'main')] })
+    expect(p.indexOf(INJECTION_GUARD)).toBeLessThan(p.indexOf('## 참조 대화 (2)'))
+    expect(p.indexOf('### [주 입력] WK-2')).toBeLessThan(p.indexOf('### [참고] WK-1'))
+    expect(p).toContain('메시지 2개')
+    expect(p).toContain('[사용자 · 박] WK-1 질문')
+    expect(p).toContain('[assistant] WK-1 답변')
+  })
+
+  it('summary mode sends the reviewed summary instead of the transcript', async () => {
+    const p = await buildTaskSystemPrompt({
+      assistant,
+      task,
+      linkedSrs: [],
+      inputs: [],
+      conversations: [conv('WK-3', 'reference', { mode: 'summary', summaryText: '결정: 보관 90일', messages: [] })],
+    })
+    expect(p).toContain('요약')
+    expect(p).toContain('결정: 보관 90일')
+    expect(p).not.toContain('WK-3 질문')
   })
 })
