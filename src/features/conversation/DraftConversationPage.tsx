@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { toast } from 'sonner'
-import { ArrowRight, BookOpen, ExternalLink, Info } from 'lucide-react'
+import { ArrowRight, BookOpen, ExternalLink, Info, MessagesSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TopBar } from '@/app/TopBar'
@@ -16,8 +16,9 @@ import { UserAvatar } from '@/components/UserAvatar'
 import { db } from '@/db/schema'
 import { uploadFile } from '@/db/repositories/files'
 import { startConversation } from '@/db/repositories/tasks'
+import { selectConversation } from '@/db/repositories/conversationInputs'
 import { normalizeTag, tagKey } from '@/domain/tags'
-import { Composer } from '@/features/chat/Composer'
+import { Composer, type PendingAttachment } from '@/features/chat/Composer'
 import { suggestionsFrom } from '@/features/chat/suggestions'
 import type { ConversationHandoff } from '@/features/task/TaskPage'
 import { assistantLink1 } from '@/lib/links'
@@ -26,6 +27,7 @@ import { assistantLink1 } from '@/lib/links'
  * 새 대화 초안. 카드를 누르면 바로 여기서 입력할 수 있고,
  * **첫 전송(또는 첨부) 때만** 대화(업무)를 만든다 — 그냥 나가면 빈 업무가 남지 않는다.
  * `?tag=` 로 태그를 미리 채울 수 있다 (칸반 태그 필터·SR 연결 업무 시작).
+ * `?ref=대화ID` 면 그 대화를 새 대화의 ★ 참조 대화로 고른다 (요청 크기 한도 초과 시 "새 대화로 이어가기").
  */
 export function DraftConversationPage() {
   const { assistantId } = useParams()
@@ -38,6 +40,8 @@ export function DraftConversationPage() {
   const navigate = useNavigate()
   const [tags, setTags] = useState<string[]>(() => params.getAll('tag').map(normalizeTag).filter(Boolean))
   const [showUsage, setShowUsage] = useState(false)
+  const refId = params.get('ref') ?? undefined
+  const refTask = useLiveQuery(() => (refId ? db.tasks.get(refId) : undefined), [refId])
 
   if (assistant === undefined) {
     return (
@@ -54,12 +58,23 @@ export function DraftConversationPage() {
   const retired = assistant.status === 'retired'
   const owner = users.get(assistant.ownerId)
 
-  async function handleSend(text: string, files: File[]) {
+  async function handleSend(text: string, attachments: PendingAttachment[]) {
     if (!actor || !assistant) return
     try {
       const { task } = await startConversation(actor, { assistantId: assistant.id, tags })
-      const uploaded = await Promise.all(files.map((f) => uploadFile(actor, { taskId: task.id }, f)))
-      const handoff: ConversationHandoff = { autoSend: { text: text || `(파일 ${uploaded.length}건 첨부)`, attachmentIds: uploaded.map((f) => f.id) } }
+      if (refTask) {
+        await selectConversation(actor, task.id, refTask.id, { weight: 'main' }).catch((e: unknown) =>
+          toast.error('참조 대화를 고르지 못했습니다.', { description: e instanceof Error ? e.message : String(e) }),
+        )
+      }
+      const uploaded = await Promise.all(attachments.map((a) => uploadFile(actor, { taskId: task.id }, a.file)))
+      const handoff: ConversationHandoff = {
+        autoSend: {
+          text: text || `(파일 ${uploaded.length}건 첨부: ${uploaded.map((f) => f.name).join(', ')})`,
+          attachmentIds: uploaded.map((f) => f.id),
+          oneShotFileIds: uploaded.filter((_, i) => attachments[i].once).map((f) => f.id),
+        },
+      }
       navigate(`/c/${task.id}`, { replace: true, state: handoff })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '대화를 시작하지 못했습니다.')
@@ -134,6 +149,18 @@ export function DraftConversationPage() {
               <p className="text-[11px] text-muted-foreground">같은 태그를 가진 대화의 산출물이 자료함에 보입니다. 나중에 붙였다 떼도 됩니다.</p>
             </div>
 
+            {refTask && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50/40 p-3 text-xs dark:bg-amber-950/10">
+                <MessagesSquare className="mt-0.5 size-4 text-violet-500" />
+                <div>
+                  <div className="font-medium">
+                    <span className="font-mono text-muted-foreground">{refTask.code}</span> {refTask.title}
+                  </div>
+                  <p className="text-muted-foreground">첫 메시지를 보내면 이 대화를 ★ 주 입력(참조 대화, 전체 원문)으로 골라 둡니다. 자료 탭에서 범위를 줄이거나 요약으로 바꿀 수 있습니다.</p>
+                </div>
+              </div>
+            )}
+
             {assistant.usageExample && (
               <div className="rounded-xl border">
                 <button type="button" className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-medium" onClick={() => setShowUsage((v) => !v)}>
@@ -156,7 +183,8 @@ export function DraftConversationPage() {
               disabled={!actor}
               streaming={false}
               placeholder={`${assistant.name}에게 메시지 — "시작"을 보내면 질문 흐름으로 안내합니다`}
-              onSend={(text, files) => handleSend(text, files)}
+              onSend={(text, attachments) => handleSend(text, attachments)}
+              allowPin
               onStop={() => undefined}
               suggestions={suggestionsFrom(assistant.usageExample)}
             />

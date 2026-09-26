@@ -1,8 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/schema'
 import { filesForTask } from '@/db/repositories/files'
+import { loadConversationInputs, type LoadedConversationInput } from '@/db/repositories/conversationInputs'
+import { conversationCandidates, eligibleMessages, type ConversationCandidate } from '@/domain/conversationContext'
+import { byteLength } from '@/domain/requestBudget'
 import { isSrTag, sharedPool, type SharedPool } from '@/domain/tags'
 import type { ActivityLog, Assistant, FileAsset, Note, ServiceRequest, Task } from '@/domain/types'
+
+/** 같은 태그 대화 후보 + 전달될 원문 규모 */
+export interface CandidateRow extends ConversationCandidate {
+  /** 전달 가능한 메시지 수 (완료된 사용자·assistant 발화) */
+  messageCount: number
+  /** 전체 원문 크기(대략) */
+  bytes: number
+}
 
 export interface TaskData {
   task: Task
@@ -17,8 +28,10 @@ export interface TaskData {
   srFiles: FileAsset[]
   /** 태그로 발견되는 공유 자료함 (발견 ≠ 사용) */
   pool: SharedPool
-  /** 태그를 공유하는 다른 대화 (직접 겹침만) */
-  related: Array<{ task: Task; assistant?: Assistant; viaTags: string[] }>
+  /** 태그를 직접 공유하는 다른 대화 — 이동 링크와 참조 대화 후보에 함께 쓴다 (최근 활동순) */
+  related: CandidateRow[]
+  /** AI 입력으로 고른 참조 대화 (선택 시점 스냅샷) */
+  conversationInputs: LoadedConversationInput[]
 }
 
 /** 대화 화면에 필요한 데이터를 한 번에 구독 */
@@ -30,7 +43,7 @@ export function useTaskData(taskId: string | undefined): TaskData | null | undef
     const assistant = await db.assistants.get(task.assistantId)
     if (!assistant) return null
     const srCodes = task.tags.filter(isSrTag)
-    const [files, notes, activity, allTasks, allFiles, assistants, linkedSrs] = await Promise.all([
+    const [files, notes, activity, allTasks, allFiles, assistants, linkedSrs, conversationInputs] = await Promise.all([
       filesForTask(task),
       db.notes.where('taskId').equals(taskId).sortBy('createdAt'),
       db.activity.where('taskId').equals(taskId).sortBy('at'),
@@ -38,16 +51,17 @@ export function useTaskData(taskId: string | undefined): TaskData | null | undef
       db.files.toArray(),
       db.assistants.toArray(),
       srCodes.length ? db.serviceRequests.where('code').anyOf(srCodes).toArray() : Promise.resolve([] as ServiceRequest[]),
+      loadConversationInputs(taskId),
     ])
     const srFileIds = linkedSrs.flatMap((s) => s.attachmentIds)
     const srFiles = allFiles.filter((f) => srFileIds.includes(f.id))
-    const asstById = new Map(assistants.map((a) => [a.id, a]))
-    const myKeys = new Set(task.tags.map((t) => t.toLowerCase()))
-    const related = allTasks
-      .filter((t) => t.id !== task.id)
-      .map((t) => ({ task: t, assistant: asstById.get(t.assistantId), viaTags: t.tags.filter((x) => myKeys.has(x.toLowerCase())) }))
-      .filter((r) => r.viaTags.length > 0)
-      .sort((a, b) => (a.assistant?.order ?? 0) - (b.assistant?.order ?? 0) || b.task.lastActivityAt.localeCompare(a.task.lastActivityAt))
+    const candidates = conversationCandidates(task, allTasks, assistants)
+    const threadIds = candidates.map((c) => c.task.threadId).filter((id): id is string => !!id)
+    const messages = threadIds.length ? await db.messages.where('threadId').anyOf(threadIds).toArray() : []
+    const related = candidates.map((c): CandidateRow => {
+      const eligible = eligibleMessages(messages.filter((m) => m.threadId === c.task.threadId))
+      return { ...c, messageCount: eligible.length, bytes: eligible.reduce((n, m) => n + byteLength(m.content), 0) }
+    })
     return {
       task,
       assistant,
@@ -58,6 +72,7 @@ export function useTaskData(taskId: string | undefined): TaskData | null | undef
       srFiles,
       pool: sharedPool(task, allTasks, allFiles, assistants),
       related,
+      conversationInputs,
     }
   }, [taskId])
 }

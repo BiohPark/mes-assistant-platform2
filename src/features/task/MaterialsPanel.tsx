@@ -2,8 +2,9 @@ import { useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
-import { ArrowUpCircle, ChevronDown, ChevronRight, FileText, Inbox, Lightbulb, Sparkles, Upload } from 'lucide-react'
+import { ArrowUpCircle, ChevronDown, ChevronRight, FileText, Inbox, Lightbulb, Search, Sparkles, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { AssistantAvatar } from '@/components/AssistantAvatar'
 import { TagChip } from '@/components/TagChip'
 import { useActor } from '@/app/hooks'
@@ -13,6 +14,8 @@ import { setInput, switchInputVersion } from '@/db/repositories/tasks'
 import type { PoolItem } from '@/domain/tags'
 import type { FileAsset, TaskInput } from '@/domain/types'
 import { cn } from '@/lib/utils'
+import { ConversationCandidateList, SelectedConversationList, type PickerTarget } from './ConversationInputs'
+import { ConversationPickerDialog } from './ConversationPickerDialog'
 import { FileList } from './FileList'
 import { FilePreviewDialog } from './FilePreviewDialog'
 import { InputToggle } from './InputToggle'
@@ -50,6 +53,11 @@ export function MaterialsPanel({ data, readOnly }: MaterialsPanelProps) {
   const uploadRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<FileAsset | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [picker, setPicker] = useState<PickerTarget | null>(null)
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const groups = q ? pool.groups.map((g) => ({ ...g, items: g.items.filter((i) => i.file.name.toLowerCase().includes(q)) })).filter((g) => g.items.length) : pool.groups
+  const poolCount = pool.groups.reduce((n, g) => n + g.items.length, 0)
 
   const change = (file: FileAsset) => (weight: Weight | null) => {
     if (actor) void setInput(actor, task.id, file.id, weight)
@@ -66,8 +74,12 @@ export function MaterialsPanel({ data, readOnly }: MaterialsPanelProps) {
 
   async function upload(list: globalThis.FileList | null) {
     if (!actor || !list?.length) return
-    for (const f of Array.from(list)) await uploadFile(actor, { taskId: task.id }, f)
-    toast.success(`${list.length}개 파일을 업로드했습니다.`)
+    try {
+      for (const f of Array.from(list)) await uploadFile(actor, { taskId: task.id }, f)
+      toast.success(`${list.length}개 파일을 업로드했습니다. AI에 보내려면 체크하세요.`)
+    } catch (e) {
+      toast.error('업로드하지 못했습니다.', { description: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   const toggleExpand = (id: string) =>
@@ -95,13 +107,16 @@ export function MaterialsPanel({ data, readOnly }: MaterialsPanelProps) {
         </div>
       )}
 
-      <Section title="AI 입력" count={selected.length} hint="선택한 것만 AI에 전달">
+      <Section title="AI 입력" count={selected.length + data.conversationInputs.length} hint="선택한 것만 AI에 전달">
+        <SelectedConversationList data={data} readOnly={readOnly} onOpenPicker={setPicker} />
         {selected.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-3 text-center text-[11px] text-muted-foreground">
-            아래 자료에서 체크(참고) 또는 ★(주 입력)로 고르세요.
-            <br />
-            태그로 보이기만 하는 자료는 전달되지 않습니다.
-          </div>
+          data.conversationInputs.length === 0 && (
+            <div className="rounded-lg border border-dashed p-3 text-center text-[11px] text-muted-foreground">
+              아래 파일이나 같은 태그 대화를 체크(참고) 또는 ★(주 입력)로 고르세요.
+              <br />
+              태그로 보이기만 하는 자료는 전달되지 않습니다.
+            </div>
+          )
         ) : (
           <ul className="space-y-1">
             {selected.map((i) => {
@@ -137,17 +152,25 @@ export function MaterialsPanel({ data, readOnly }: MaterialsPanelProps) {
         )}
       </Section>
 
-      <Section title="공유 자료함" count={pool.groups.reduce((n, g) => n + g.items.length, 0)} hint={task.tags.length ? '같은 태그 대화의 파일' : undefined}>
+      <Section title="공유 자료함" count={poolCount} hint={task.tags.length ? '같은 태그 대화의 파일' : undefined}>
+        {poolCount > 3 && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="파일 이름으로 찾기" className="h-7 pl-6 text-xs" aria-label="공유 자료함 검색" />
+          </div>
+        )}
         {task.tags.length === 0 ? (
           <div className="rounded-lg border border-dashed p-3 text-center text-[11px] text-muted-foreground">
             <Inbox className="mx-auto mb-1 size-4" />
             태그를 붙이면 같은 태그 대화의 산출물이 여기에 보입니다.
           </div>
-        ) : pool.groups.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-3 text-center text-[11px] text-muted-foreground">같은 태그를 가진 다른 대화에 아직 파일이 없습니다.</div>
+        ) : groups.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-3 text-center text-[11px] text-muted-foreground">
+            {q ? '이름이 맞는 파일이 없습니다.' : '같은 태그를 가진 다른 대화에 아직 파일이 없습니다.'}
+          </div>
         ) : (
           <div className="space-y-2">
-            {pool.groups.map((g) => (
+            {groups.map((g) => (
               <div key={g.assistant.id} className="rounded-lg border">
                 <div className="flex items-center gap-1.5 border-b bg-muted/30 px-2 py-1 text-[11px] font-medium">
                   <AssistantAvatar assistant={g.assistant} size="xs" className="size-4 rounded text-[8px]" />
@@ -176,6 +199,10 @@ export function MaterialsPanel({ data, readOnly }: MaterialsPanelProps) {
             ))}
           </div>
         )}
+      </Section>
+
+      <Section title="같은 태그 대화" count={data.related.length} hint="대화 자체를 입력으로">
+        <ConversationCandidateList data={data} readOnly={readOnly} onOpenPicker={setPicker} />
       </Section>
 
       {srFiles.length > 0 && (
@@ -211,6 +238,18 @@ export function MaterialsPanel({ data, readOnly }: MaterialsPanelProps) {
         )}
       </Section>
       <FilePreviewDialog file={preview} onClose={() => setPreview(null)} />
+      {picker && (
+        <ConversationPickerDialog
+          key={picker.source.id}
+          task={task}
+          assistant={assistant}
+          source={picker.source}
+          sourceAssistant={picker.sourceAssistant}
+          current={picker.current}
+          initialMode={picker.mode}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </div>
   )
 }

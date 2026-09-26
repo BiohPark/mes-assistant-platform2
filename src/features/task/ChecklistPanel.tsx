@@ -81,7 +81,7 @@ export function ChecklistPanel({ task, assistant, readOnly }: ChecklistPanelProp
                 <button
                   type="button"
                   aria-label="항목 삭제"
-                  className="invisible text-muted-foreground hover:text-destructive group-hover:visible"
+                  className="invisible text-muted-foreground hover:text-destructive group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
                   onClick={() => removeChecklistItem(task.id, c.id)}
                 >
                   <Trash2 className="size-3.5" />

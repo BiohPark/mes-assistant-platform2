@@ -153,6 +153,11 @@ export async function removeConversationInput(actor: Actor, inputId: ID): Promis
   })
 }
 
+/** 대화 쌍으로 입력 찾기 (트레이의 칩처럼 원본 대화만 아는 곳에서) */
+export async function findConversationInput(taskId: ID, sourceTaskId: ID): Promise<ConversationInput | undefined> {
+  return db.conversationInputs.where('[taskId+sourceTaskId]').equals([taskId, sourceTaskId]).first()
+}
+
 export interface LoadedConversationInput {
   input: ConversationInput
   snapshot: ContextSnapshot

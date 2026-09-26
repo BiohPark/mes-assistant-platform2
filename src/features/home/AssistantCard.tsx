@@ -62,7 +62,7 @@ export function AssistantCard({ row, owner, baseUrl }: AssistantCardProps) {
         <Link to={`/new/${encodeURIComponent(a.id)}`} className="absolute inset-0 rounded-2xl" aria-label={`${a.name}와 새 대화`} />
       )}
       <AssistantCardBody row={row} owner={owner} dimmed={retired} />
-      <div className="absolute inset-x-3 bottom-3 z-10 hidden gap-1 group-hover:flex">
+      <div className="absolute inset-x-3 bottom-3 z-10 hidden gap-1 group-hover:flex group-focus-within:flex [@media(hover:none)]:flex">
         {!retired && (
           <Button size="xs" variant="secondary" asChild>
             <Link to={`/new/${encodeURIComponent(a.id)}`}>

@@ -15,16 +15,17 @@ interface ShareResultDialogProps {
   sr: ServiceRequest
   /** 업무 화면에서 열었을 때: 이 업무 파일을 공유 후보로 */
   task?: Task
+  /** 공유 후보 파일. task가 있으면 그 업무에서 만든 파일만 남긴다 (SR 관리에서는 연결 대화의 산출물) */
   files?: FileAsset[]
 }
 
-/** 담당자 → 요청자 결과 공유. 텍스트 + 이 업무 파일 선택. 내부 대화는 공유되지 않는다. */
+/** 담당자 → 요청자 결과 공유. 텍스트 + 파일 선택. 내부 대화는 공유되지 않는다. */
 export function ShareResultDialog({ open, onOpenChange, sr, task, files = [] }: ShareResultDialogProps) {
   const actor = useActor()
   const [text, setText] = useState('')
   const [fileIds, setFileIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const candidates = task ? files.filter((f) => f.originTaskId === task.id) : []
+  const candidates = task ? files.filter((f) => f.originTaskId === task.id) : files
 
   async function share() {
     if (!actor) return

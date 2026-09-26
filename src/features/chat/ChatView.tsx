@@ -1,17 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { toast } from 'sonner'
 import { Bot } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useActor, useUserMap } from '@/app/hooks'
 import { AvatarGroup } from '@/components/UserAvatar'
+import { loadConversationInputs } from '@/db/repositories/conversationInputs'
 import { uploadFile } from '@/db/repositories/files'
-import type { FileAsset, Message } from '@/domain/types'
-import { useChat, type ChatScope } from './useChat'
+import { budgetLevel } from '@/domain/requestBudget'
+import type { ConversationRequestInput, FileAsset, Message } from '@/domain/types'
+import { ConversationPickerDialog } from '@/features/task/ConversationPickerDialog'
+import { useChat, type ChatScope, type RetryOptions } from './useChat'
 import { MessageBubble } from './MessageBubble'
-import { Composer } from './Composer'
+import { Composer, type PendingAttachment } from './Composer'
+import { ContextTray } from './ContextTray'
 import { SaveAsOutputDialog } from './SaveAsOutputDialog'
 import { suggestionsFrom } from './suggestions'
 import { ModelPicker } from './ModelPicker'
+import { useRequestEstimate } from './useRequestEstimate'
 import { notifyTyping, useTypingUsers } from '@/app/presence'
+
+/** 초안 화면에서 넘겨받는 첫 메시지 */
+export interface InitialMessage {
+  text: string
+  attachmentIds: string[]
+  /** 대화 입력으로 고정하지 않은 첨부 */
+  oneShotFileIds?: string[]
+}
 
 interface ChatViewProps {
   scope: ChatScope
@@ -19,26 +35,40 @@ interface ChatViewProps {
   /** 메시지 첨부 표시에 쓰는 파일 */
   files?: FileAsset[]
   /** 초안 화면에서 넘겨받은 첫 메시지. 마운트 후 한 번만 보낸다. */
-  initialMessage?: { text: string; attachmentIds: string[] }
+  initialMessage?: InitialMessage
   onInitialSent?: () => void
 }
 
 const SR_SUGGESTIONS = ['화면 개선을 요청하고 싶어요', '데이터 오류를 신고하고 싶어요', '새 기능이 필요해요']
 
+/** 가장 최근의 실패한 답변 (그 뒤에 AI 대화가 없을 때만 다시 시도 가능) */
+function lastFailedReply(messages: Message[]): Message | undefined {
+  const last = [...messages].reverse().find((m) => m.kind !== 'discussion')
+  return last?.role === 'assistant' && last.status === 'error' ? last : undefined
+}
+
 export function ChatView({ scope, readOnly, files = [], initialMessage, onInitialSent }: ChatViewProps) {
   const actor = useActor()
   const users = useUserMap()
+  const navigate = useNavigate()
   const chat = useChat(actor, scope)
   const typingIds = useTypingUsers(chat.thread?.id, actor?.userId)
   const { remoteStreaming } = chat
   const participantIds = Array.from(new Set(chat.messages.filter((m) => m.role === 'user' && m.authorId).map((m) => m.authorId!)))
   const [saveTarget, setSaveTarget] = useState<Message | null>(null)
+  const [draft, setDraft] = useState('')
+  const [adjust, setAdjust] = useState<{ sourceTaskId: string; mode: 'messages' | 'summary' } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const assistant = scope.kind === 'task' ? scope.assistant : scope.intake
   const task = scope.kind === 'task' ? scope.task : undefined
   const fileMap = new Map((scope.kind === 'task' ? files : scope.files).map((f) => [f.id, f]))
   const suggestions = scope.kind === 'sr' ? SR_SUGGESTIONS : suggestionsFrom(assistant.usageExample)
+  const estimate = useRequestEstimate(scope, chat.thread, chat.messages, draft, !!task && !readOnly)
+  const over = estimate && budgetLevel(estimate.bytes, estimate.limitBytes) === 'over'
+  const failed = readOnly || chat.streaming || remoteStreaming ? undefined : lastFailedReply(chat.messages)
+  const conversationInputs = useLiveQuery(() => (task && adjust ? loadConversationInputs(task.id) : []), [task?.id, adjust])
+  const adjusting = conversationInputs?.find((c) => c.source.id === adjust?.sourceTaskId)
 
   // 초안 → 대화 전환: 첫 메시지를 한 번만 보낸다 (StrictMode 재실행에도 ref로 막음)
   const initialSentRef = useRef(false)
@@ -47,7 +77,9 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
     if (!initialMessage || initialSentRef.current || !actor) return
     initialSentRef.current = true
     onInitialSent?.()
-    void send(initialMessage.text, initialMessage.attachmentIds)
+    send(initialMessage.text, initialMessage.attachmentIds, initialMessage.oneShotFileIds).catch((e: unknown) =>
+      toast.error('첫 메시지를 보내지 못했습니다.', { description: e instanceof Error ? e.message : String(e) }),
+    )
   }, [initialMessage, actor, send, onInitialSent])
 
   const lastContent = chat.messages.at(-1)?.content
@@ -56,14 +88,24 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
     if (el) el.scrollTop = el.scrollHeight
   }, [chat.messages.length, lastContent])
 
-  async function handleSend(text: string, attachments: File[], discussion: boolean) {
+  async function handleSend(text: string, attachments: PendingAttachment[], discussion: boolean) {
     if (!actor) return
     const origin = scope.kind === 'task' ? { taskId: scope.task.id } : { srId: scope.sr.id }
-    const uploaded = await Promise.all(attachments.map((f) => uploadFile(actor, origin, f)))
-    const body = text || `(파일 ${uploaded.length}건 첨부)`
+    const uploaded = await Promise.all(attachments.map((a) => uploadFile(actor, origin, a.file)))
+    const body = text || `(파일 ${uploaded.length}건 첨부: ${uploaded.map((f) => f.name).join(', ')})`
     const ids = uploaded.map((f) => f.id)
     if (discussion) await chat.sendDiscussion(body, ids)
-    else await chat.send(body, ids)
+    else await chat.send(body, ids, uploaded.filter((_, i) => attachments[i].once).map((f) => f.id))
+  }
+
+  function retry(message: Message, opts?: RetryOptions) {
+    chat.retry(message.id, opts).catch((e: unknown) => toast.error('다시 보내지 못했습니다.', { description: e instanceof Error ? e.message : String(e) }))
+  }
+
+  function continueInNew() {
+    if (!task) return
+    const params = new URLSearchParams([...task.tags.map((t) => ['tag', t]), ['ref', task.id]])
+    navigate(`/new/${assistant.id}?${params.toString()}`)
   }
 
   return (
@@ -77,7 +119,7 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
         {participantIds.length > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex items-center gap-1 rounded-md px-1 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] text-muted-foreground">
                 <AvatarGroup users={participantIds.map((id) => users.get(id))} max={4} />
                 {participantIds.length >= 2 && <span>{participantIds.length}명 참여</span>}
               </span>
@@ -99,8 +141,8 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
             <div className="text-sm font-medium">{assistant.name}와 대화를 시작하세요</div>
             <p className="mt-1 text-xs text-muted-foreground">
               {scope.kind === 'task'
-                ? '자료 패널에서 고른 입력(★ 주 입력 / ☑ 참고)만 AI에 전달됩니다. 좋은 답변은 "산출물로 저장"하면 같은 태그 대화의 자료함에 나타납니다.'
-                : '요청 내용을 편하게 말씀해 주세요. 준비되면 상단의 "접수로 전환"으로 정식 접수할 수 있습니다.'}
+                ? 'AI에는 고른 입력(★ 주 입력 / ☑ 참고 — 파일·같은 태그 대화)과 여기서 첨부한 파일만 갑니다. 입력창 위 "이번 요청에 사용"에서 확인하세요. 좋은 답변은 "산출물로 저장"하면 같은 태그 대화의 자료함에 나타납니다.'
+                : '요청 내용을 편하게 말씀해 주세요. 첨부한 파일은 함께 전달됩니다. 준비되면 상단의 "접수로 전환"으로 정식 접수할 수 있습니다.'}
             </p>
           </div>
         )}
@@ -111,6 +153,8 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
             files={fileMap}
             assistantName={assistant.name}
             onSaveAsOutput={readOnly || !task ? undefined : setSaveTarget}
+            onRetry={failed?.id === m.id ? (opts) => retry(m, opts) : undefined}
+            phase={m.status === 'streaming' ? chat.phase : undefined}
           />
         ))}
         {(typingIds.length > 0 || remoteStreaming) && (
@@ -126,18 +170,41 @@ export function ChatView({ scope, readOnly, files = [], initialMessage, onInitia
         )}
       </div>
 
+      {task && !readOnly && (
+        <ContextTray
+          task={task}
+          info={estimate}
+          onAdjustConversation={(i: ConversationRequestInput, mode) => setAdjust({ sourceTaskId: i.sourceTaskId, mode })}
+          onContinueInNew={continueInNew}
+        />
+      )}
       {!readOnly && (
         <Composer
           disabled={!actor}
           streaming={chat.streaming || remoteStreaming}
           onSend={handleSend}
           allowDiscussion={!!task}
+          allowPin={!!task}
+          blockedReason={over ? '요청 크기 한도를 넘었습니다. 입력창 위 안내에서 줄이세요.' : undefined}
+          onDraftChange={setDraft}
           onTyping={() => chat.thread && actor && notifyTyping(chat.thread.id, actor.userId)}
           onStop={chat.stop}
           suggestions={chat.messages.length === 0 ? suggestions : undefined}
         />
       )}
       {task && saveTarget && <SaveAsOutputDialog key={saveTarget.id} message={saveTarget} task={task} assistant={assistant} onClose={() => setSaveTarget(null)} />}
+      {task && adjusting && adjust && (
+        <ConversationPickerDialog
+          key={`${adjusting.source.id}-${adjust.mode}`}
+          task={task}
+          assistant={assistant}
+          source={adjusting.source}
+          sourceAssistant={adjusting.assistant}
+          current={adjusting}
+          initialMode={adjust.mode}
+          onClose={() => setAdjust(null)}
+        />
+      )}
     </div>
   )
 }

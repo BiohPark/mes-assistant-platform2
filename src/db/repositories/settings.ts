@@ -18,6 +18,13 @@ export async function setLlmSettings(llm: LlmSettings): Promise<void> {
   await db.settings.put({ ...s, llm })
 }
 
+/** 요청 본문 크기 한도(바이트). 1 KiB ~ 16 MiB. 모델 토큰 한도와 다르다 */
+export async function setRequestBudget(bytes: number): Promise<void> {
+  if (!Number.isFinite(bytes) || bytes < 1024 || bytes > 16 * 1024 * 1024) throw new Error('요청 크기 한도는 1 KB ~ 16 MB 사이로 정하세요.')
+  const s = await getSettings()
+  await db.settings.put({ ...s, requestBudgetBytes: Math.round(bytes) })
+}
+
 export async function setSrIntakeAssistant(assistantId: ID | undefined): Promise<void> {
   if (assistantId) {
     const a = await db.assistants.get(assistantId)

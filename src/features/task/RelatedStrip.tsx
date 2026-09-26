@@ -10,7 +10,7 @@ interface RelatedStripProps {
   related: TaskData['related']
 }
 
-/** 태그를 직접 공유하는 다른 대화 (에이전트 순서). 연결은 태그로만 — 떼면 사라진다. */
+/** 태그를 직접 공유하는 다른 대화 (최근 활동순). 연결은 태그로만 — 떼면 사라진다. */
 export function RelatedStrip({ related }: RelatedStripProps) {
   if (related.length === 0) return null
   return (
@@ -25,7 +25,7 @@ export function RelatedStrip({ related }: RelatedStripProps) {
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-1">
-        <div className="px-2 py-1 text-[11px] text-muted-foreground">같은 태그를 가진 대화 — 자료는 공유 자료함에서 골라 쓰세요</div>
+        <div className="px-2 py-1 text-[11px] text-muted-foreground">같은 태그를 가진 대화 — 자료 탭에서 파일이나 대화를 AI 입력으로 고를 수 있습니다</div>
         <ul className="max-h-72 overflow-y-auto">
           {related.map(({ task, assistant, viaTags }) => (
             <li key={task.id}>

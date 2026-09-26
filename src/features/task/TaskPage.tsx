@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TopBar } from '@/app/TopBar'
+import type { InitialMessage } from '@/features/chat/ChatView'
 import { TaskBody } from './TaskBody'
 import { TaskCompleteDialog } from './TaskCompleteDialog'
 import { TaskHeader } from './TaskHeader'
@@ -9,7 +10,7 @@ import { useTaskData } from './useTaskData'
 
 /** 초안 화면(/new/:assistantId)이 첫 전송 때 넘기는 메시지 */
 export interface ConversationHandoff {
-  autoSend?: { text: string; attachmentIds: string[] }
+  autoSend?: InitialMessage
 }
 
 export function TaskPage() {

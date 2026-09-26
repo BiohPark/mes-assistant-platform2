@@ -41,6 +41,8 @@ export function ChecklistReviewCard({ task, assistant, readOnly }: ChecklistRevi
       const result = await reviewChecklist(createProvider(settings.llm), model, task.checklist, history, actor.userId)
       await saveChecklistReview(actor, task.id, result)
       toast.success(`AI 달성도 ${result.met}/${result.total}`, { description: result.source === 'rule' ? '규칙 기반 판단 (Mock 또는 응답 해석 실패)' : undefined })
+    } catch (e) {
+      toast.error('달성도를 점검하지 못했습니다.', { description: e instanceof Error ? e.message : String(e) })
     } finally {
       setBusy(false)
     }

@@ -48,7 +48,7 @@ export function NotesPanel({ taskId, notes, files, placeholder }: NotesPanelProp
                 <button
                   type="button"
                   aria-label="메모 삭제"
-                  className="ml-auto invisible hover:text-destructive group-hover:visible"
+                  className="ml-auto invisible hover:text-destructive group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
                   onClick={() => deleteNote(n.id)}
                 >
                   <Trash2 className="size-3" />

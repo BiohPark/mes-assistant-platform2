@@ -72,7 +72,7 @@ export function ConversationCard({ task, onTagClick, onStatusChange }: Conversat
         {onStatusChange && task.status !== 'done' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-xs" className="relative z-10 ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100" aria-label="상태 변경">
+              <Button variant="ghost" size="icon-xs" className="relative z-10 ml-auto opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100" aria-label="상태 변경">
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>

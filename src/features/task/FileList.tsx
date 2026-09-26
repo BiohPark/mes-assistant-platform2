@@ -89,7 +89,7 @@ export function FileList({ files, task, onToggleOutput, onPreview, canDelete = t
               <div className="flex shrink-0 items-center gap-0.5">
                 {renderActions?.(f)}
               </div>
-              <div className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100">
+              <div className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                 {task && onToggleOutput && !fromOther && (
                   <Tooltip>
                     <TooltipTrigger asChild>
