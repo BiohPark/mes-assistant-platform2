@@ -313,7 +313,25 @@
 
 ---
 
-## 10. 관련 문서
+## 10. 데모 반영 현황 (2-b UX 검증 스프린트, 브랜치 `feat/ux-sprint`)
+
+사용자 승인(추천대로 진행)으로 §1의 2-b를 데모에 반영했다. 아래는 **구현·검증된 것**이며, 검증은 모의 API·가상 자료 기준이다([evaluation/context-flow.md](evaluation/context-flow.md)).
+
+| 설계 | 반영 | 코드 |
+|---|---|---|
+| §5 같은 태그 대화를 입력으로 선택 (전체·메시지 선택·요약, 스냅샷 고정, 갱신 안내, 재귀 없음, 삭제 보호) | 완료 | `src/domain/conversationContext.ts`, `src/db/repositories/conversationInputs.ts`, `src/features/task/ConversationInputs.tsx`, `ConversationPickerDialog.tsx` |
+| 조용한 절단 제거 + 요청 바이트 한도(기본 256 KiB, 설정) + 전송 차단·안내 | 완료 | `src/domain/requestBudget.ts`, `src/llm/context.ts`, `src/features/chat/ContextTray.tsx` |
+| 트레이("이번 요청에 사용")·답변별 "사용한 자료"·앱 내 전송 기록 | 완료 | `src/llm/promptBuilder.ts`(실제 전송과 같은 조립), `useRequestEstimate.ts`, `MessageBubble.tsx`, `RequestInfoDialog.tsx` |
+| OpenWebUI 처리 완료 확인·버전 이름·주 입력 먼저·중지 신호, 실패 시 중단 + 항목별 복구 (정책 7) | 완료 | `src/llm/openwebuiFiles.ts`, `src/app/chatRunner.ts` |
+| 대화당 진행 중 요청 1건·생존 신호·끊긴 응답 정리·시간 제한·재시도(사용자 메시지 재사용)·응답 중 완료 차단·화면 이동해도 요청 유지 | 완료 (데모 최소판 — 서버판은 새 저장소) | `src/app/chatRunner.ts`, `src/db/repositories/chat.ts` |
+| 컴포저 첨부 입력 고정(정책 8), SR 첨부 전송 시점 재조회, 산출물 버전 체인 | 완료 | `useChat.ts`, `Composer.tsx`, `promptBuilder.ts`, `SaveAsOutputDialog.tsx` |
+| 백업에 API 키·원격 파일 ID 없음, 가져오기 시 로컬 키·사용자 유지 | 완료 | `src/db/exportImport.ts` |
+| Mock "사용한 자료" 블록, 항상 보이는 액션(포커스·터치), 조용한 실패 제거, SR 결과 공유 파일 후보 | 완료 | 각 화면 |
+| 데이터 계약·DDL·API 대응표 (§8) | 문서 완료 | [architecture/data-contract.md](architecture/data-contract.md), [architecture/postgres-draft.sql](architecture/postgres-draft.sql) |
+| 폰트(Pretendard)·다크 모드·자료함 외 칸반 열 개별 접기 | **하지 않음** | 새 저장소로 이월되는 시각 작업이지만 검증 목적과 무관해 보류 |
+| 현업 UX 시험 → 정책 확정 → 데모 동결 | **남음** | [evaluation/ux-test-script.md](evaluation/ux-test-script.md) |
+
+## 11. 관련 문서
 
 - [HANDOFF.md](HANDOFF.md) — 현재 상태·결정 로그·미결정 항목
 - [conversation-hub.md](conversation-hub.md) — 현행 대화·태그 모델 설계

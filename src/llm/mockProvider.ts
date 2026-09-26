@@ -78,6 +78,7 @@ export class MockProvider implements ChatProvider {
         taskTitle: meta.taskTitle ?? '업무',
         assistantName: meta.assistantName ?? '어시스턴트',
         inputFileNames: meta.inputFileNames ?? [],
+        hasInputs: !!meta.usedInputs?.length || !!meta.inputFileNames?.length,
         userText,
         turn: Math.max(0, turn - offset),
       })

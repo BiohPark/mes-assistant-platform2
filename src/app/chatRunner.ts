@@ -220,21 +220,26 @@ async function run(args: RunArgs): Promise<void> {
   } finally {
     clearTimeout(deadline)
     clearInterval(keepalive)
-    runs.delete(thread.id)
-    emit()
     const reason = controller.signal.reason as Abort | undefined
-    if (reason !== 'lost') {
-      const message = abortMessage(reason) ?? error
-      await fencedUpdate(acquired.replyId, {
-        content: acc || (message ? `⚠️ ${message}` : ''),
-        status: message ? 'error' : 'done',
-        error: message,
-        requestInfo: info,
-        requestSnapshot,
-        heartbeatAt: undefined,
-      })
-      if (!message && scope.kind === 'task' && settings) void maybeRetitle(scope.task.id, (deps.provider ?? createProvider)(settings), model, thread.id)
+    const message = reason === 'lost' ? undefined : (abortMessage(reason) ?? error)
+    try {
+      // 최종 내용을 DB에 먼저 쓴 뒤 메모리 진행 상태를 지운다.
+      // 순서가 반대면 마지막 flush 이후의 글자가 잠깐 사라지고, 그 틈의 전송이 "응답 중"으로 거부된다.
+      if (reason !== 'lost') {
+        await fencedUpdate(acquired.replyId, {
+          content: acc || (message ? `⚠️ ${message}` : ''),
+          status: message ? 'error' : 'done',
+          error: message,
+          requestInfo: info,
+          requestSnapshot,
+          heartbeatAt: undefined,
+        })
+      }
+    } finally {
+      runs.delete(thread.id)
+      emit()
     }
+    if (reason !== 'lost' && !message && scope.kind === 'task' && settings) void maybeRetitle(scope.task.id, (deps.provider ?? createProvider)(settings), model, thread.id)
   }
 }
 

@@ -7,7 +7,7 @@ import { setInput, setTaskStatus, startConversation } from '@/db/repositories/ta
 import { DEFAULT_LLM_SETTINGS, type Assistant, type LlmSettings, type Task, type Thread } from '@/domain/types'
 import type { ChatChunk, ChatProvider, ChatRequest } from '@/llm/provider'
 import type { ChatScope } from '@/llm/promptBuilder'
-import { ActiveRequestError, recoverStaleReplies, retryChat, startChat, stopChat, type RunnerDeps } from './chatRunner'
+import { ActiveRequestError, getRunsSnapshot, recoverStaleReplies, retryChat, startChat, stopChat, subscribeRuns, type RunnerDeps } from './chatRunner'
 
 const dev = { userId: 'u_dev' }
 const input = (id: string) => ({ id, name: id, level1: 'SDLC', level2: id, summary: '', ownerId: 'u_dev', status: 'open' as const, usageExample: '', checklistTemplate: [] })
@@ -85,6 +85,22 @@ describe('startChat', () => {
     expect(reply.requestInfo).toMatchObject({ provider: 'live', transport: 'inline', inputs: [] })
     expect(reply.requestSnapshot).not.toContain('"k"')
     expect(provider.calls[0].messages.at(-1)).toEqual({ role: 'user', content: '질문' })
+  })
+
+  it('keeps the live run state until the final reply is stored (no flicker, no false "busy")', async () => {
+    const { scope, thread } = await fixture()
+    const seen: Array<Promise<{ status?: string; content?: string }>> = []
+    let replyId = ''
+    const unsubscribe = subscribeRuns(() => {
+      // 진행 상태가 사라지는 순간 DB에는 이미 최종 답변이 있어야 한다
+      if (replyId && !getRunsSnapshot().has(thread.id)) seen.push(db.messages.get(replyId).then((m) => ({ status: m?.status, content: m?.content })))
+    })
+    const started = await startChat({ actor: dev, scope, thread, text: '질문' }, { provider: () => scripted('끝까지 도착한 긴 응답 본문', { delayMs: 1 }), timeouts: { ...fast, flushMs: 10_000 } })
+    replyId = started.replyId
+    await started.done
+    unsubscribe()
+    expect(seen.length).toBeGreaterThan(0)
+    expect(await seen[0]).toEqual({ status: 'done', content: '끝까지 도착한 긴 응답 본문' })
   })
 
   it('allows only one active request per conversation, even when two start at once', async () => {

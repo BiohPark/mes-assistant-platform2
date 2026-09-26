@@ -63,7 +63,10 @@ export function ConversationPickerDialog({ task, assistant, source, sourceAssist
     const target = messages[index]
     const on = !next.has(target.id)
     const [from, to] = shift && anchor !== undefined ? [Math.min(anchor, index), Math.max(anchor, index)] : [index, index]
-    for (let i = from; i <= to; i++) (on ? next.add(messages[i].id) : next.delete(messages[i].id))
+    for (let i = from; i <= to; i++) {
+      if (on) next.add(messages[i].id)
+      else next.delete(messages[i].id)
+    }
     setPicked(next)
     setAnchor(index)
   }
