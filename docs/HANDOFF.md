@@ -2,7 +2,7 @@
 
 다른 세션(사람 또는 AI)이 이어서 작업할 수 있도록 컨셉·현재 상태·결정 사항·남은 일·주의점을 한곳에 정리한다.
 기준 시점: 2026-09-23, `master` = `feat/platform-scope` 머지 직후.
-추가(2026-09-26): 형제 저장소(Codex)와의 비교·융합 설계와 진행 방식 판단은 [fusion-design.md](fusion-design.md). 이 저장소는 **데모로 마무리**하고 실제 구현은 별도 저장소에서 한다(D16). 추천안 2-b(짧은 UX 검증 스프린트)를 브랜치 `feat/ux-sprint`에 반영했다(D17) — 결과 [evaluation/context-flow.md](evaluation/context-flow.md), 새 저장소 기준 데이터 계약 [architecture/data-contract.md](architecture/data-contract.md).
+추가(2026-09-26): 형제 저장소(Codex)와의 비교·융합 설계와 진행 방식 판단은 [fusion-design.md](fusion-design.md). 이 저장소는 **데모로 마무리**하고 실제 구현은 별도 저장소에서 한다(D16). 추천안 2-b(짧은 UX 검증 스프린트)를 `feat/ux-sprint`에서 반영해 master에 병합·push했다(D17, 2026-09-26) — 결과 [evaluation/context-flow.md](evaluation/context-flow.md), 새 저장소 기준 데이터 계약 [architecture/data-contract.md](architecture/data-contract.md).
 
 ---
 
@@ -115,7 +115,6 @@ src/
 | 결정 필요 | **관리 페이지 수정 권한** — 현재 누구나 에이전트 추가·수정·삭제 가능(홈 편집 모드는 SO만) | SO만 / 담당자+SO 중 선택 대기 |
 | 결정 필요 | **System Owner 지정 UI** — 지금은 시드 또는 JSON 내보내기→`isSystemOwner` 수정→가져오기로만 변경 | 설정 화면에 추가 여부 |
 | **다음** | **현업 UX 시험 → 정책 확정 → 데모 동결(`demo-final`) → 새 저장소 착수** | [evaluation/ux-test-script.md](evaluation/ux-test-script.md). 정책은 추천값으로 적용 중(D17) |
-| 결정 필요 | `feat/ux-sprint`·`docs/fusion-design` 브랜치의 push·master 병합 | 로컬 커밋만 되어 있음 |
 | 높음 | **실제 사내 OpenWebUI 연동 확인** — CORS 허용 필요, Files API 응답 형식·`files` 파라미터 동작, 모델 ID 매핑 | 가짜 서버로만 검증됨 |
 | 높음 | 인증 없음 — 사용자 전환은 시연용(누구나 SO 가능). 운영 시 사내 SSO 연동 필요 | |
 | 중간 | assistant가 **생성한 파일**을 플랫폼 산출물로 받는 경로 — 현재는 답변 텍스트를 "산출물로 저장"만 | OpenWebUI 응답의 파일 참조 처리 |
