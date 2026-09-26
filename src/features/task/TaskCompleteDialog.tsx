@@ -1,3 +1,4 @@
+import { ActiveRequestError, assertNoActiveReply } from '@/db/repositories/chat'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Download, FileCheck2, Star } from 'lucide-react'
@@ -60,6 +61,8 @@ export function TaskCompleteDialog({ open, onOpenChange, data }: TaskCompleteDia
     if (!actor) return
     setBusy(true)
     try {
+      // 응답을 기다리는 중이면 리포트를 만들기 전에 멈춘다 (완료 뒤에 답변이 도착해 기록이 어긋나지 않게)
+      await assertNoActiveReply(task.threadId)
       for (const f of candidateFiles) {
         const want = outputs.includes(f.id)
         if (want !== task.outputFileIds.includes(f.id)) await setOutputTag(actor, task.id, f.id, want)
@@ -76,6 +79,9 @@ export function TaskCompleteDialog({ open, onOpenChange, data }: TaskCompleteDia
       await setTaskStatus(actor, task.id, 'done', { missingRequired: missing.length, reason: missing.length && reason.trim() ? reason.trim() : undefined })
       setSavedReport(report)
       toast.success('업무를 완료했습니다. 완료 리포트가 파일함에 저장되었습니다.')
+    } catch (e) {
+      const message = e instanceof ActiveRequestError ? '응답을 기다리는 중에는 완료할 수 없습니다. 응답이 끝나거나 중지한 뒤 완료하세요.' : e instanceof Error ? e.message : String(e)
+      toast.error('완료하지 못했습니다.', { description: message })
     } finally {
       setBusy(false)
     }

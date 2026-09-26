@@ -72,7 +72,10 @@ export function SrDetailSheet({ sr, open, onOpenChange }: SrDetailSheetProps) {
       db.files.bulkGet(sr.attachmentIds),
       conversationsForSr(sr.code),
     ])
-    return { messages, files: files.filter((f): f is FileAsset => !!f), conversations }
+    // 결과 공유 후보: 이 SR로 진행한 대화들의 산출물 (내부 대화 원문은 공유 대상이 아님)
+    const outputIds = conversations.flatMap((t) => t.outputFileIds)
+    const outputs = (await db.files.bulkGet(outputIds)).filter((f): f is FileAsset => !!f)
+    return { messages, files: files.filter((f): f is FileAsset => !!f), conversations, outputs }
   }, [sr.id, sr.threadId, sr.code, sr.attachmentIds.join(',')])
 
   const asstById = new Map(assistants.map((a) => [a.id, a]))
@@ -203,7 +206,7 @@ export function SrDetailSheet({ sr, open, onOpenChange }: SrDetailSheetProps) {
           </section>
         </div>
       </SheetContent>
-      {shareOpen && <ShareResultDialog open onOpenChange={setShareOpen} sr={sr} />}
+      {shareOpen && <ShareResultDialog open onOpenChange={setShareOpen} sr={sr} files={detail?.outputs ?? []} />}
     </Sheet>
   )
 }

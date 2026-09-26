@@ -1,30 +1,48 @@
 import { useRef, useState } from 'react'
-import { MessagesSquare, Paperclip, Send, Square, X } from 'lucide-react'
+import { MessagesSquare, Paperclip, Pin, PinOff, Send, Square, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+
+/** 보낼 첨부 1건. once=true면 이번 메시지에만 쓰고 대화 입력으로 고정하지 않는다 */
+export interface PendingAttachment {
+  file: File
+  once: boolean
+}
 
 interface ComposerProps {
   disabled?: boolean
   streaming: boolean
   placeholder?: string
   /** discussion=true 이면 팀 의견(AI 미전송) */
-  onSend: (text: string, files: File[], discussion: boolean) => Promise<void>
+  onSend: (text: string, attachments: PendingAttachment[], discussion: boolean) => Promise<void>
   onStop: () => void
   suggestions?: string[]
   allowAttachments?: boolean
   onTyping?: () => void
   /** 팀 의견 토글 노출 여부 (업무 채팅에서만) */
   allowDiscussion?: boolean
+  /** 첨부를 대화 입력으로 고정할지 고르는 토글 노출 (업무 채팅에서만) */
+  allowPin?: boolean
+  /** 보낼 수 없는 이유 (요청 크기 한도 초과 등). 팀 의견은 막지 않는다 */
+  blockedReason?: string
+  /** 작성 중인 글 (요청 크기 미리 계산용) */
+  onDraftChange?: (text: string) => void
 }
 
-export function Composer({ disabled, streaming, placeholder, onSend, onStop, suggestions, allowAttachments = true, onTyping, allowDiscussion }: ComposerProps) {
+export function Composer({ disabled, streaming, placeholder, onSend, onStop, suggestions, allowAttachments = true, onTyping, allowDiscussion, allowPin, blockedReason, onDraftChange }: ComposerProps) {
   const [discussion, setDiscussion] = useState(false)
-  const [text, setText] = useState('')
-  const [pending, setPending] = useState<File[]>([])
+  const [text, setTextState] = useState('')
+  const [pending, setPending] = useState<PendingAttachment[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
-  const canSend = !disabled && (discussion || !streaming) && (text.trim().length > 0 || pending.length > 0)
+  const blocked = !discussion && !!blockedReason
+  const canSend = !disabled && !blocked && (discussion || !streaming) && (text.trim().length > 0 || pending.length > 0)
+
+  const setText = (v: string) => {
+    setTextState(v)
+    onDraftChange?.(v)
+  }
 
   async function submit() {
     if (!canSend) return
@@ -38,7 +56,7 @@ export function Composer({ disabled, streaming, placeholder, onSend, onStop, sug
       // 전송 실패 시 입력을 복구해 메시지가 사라지지 않게 한다
       setText(t)
       setPending(f)
-      toast.error('전송에 실패했습니다.', { description: e instanceof Error ? e.message : String(e) })
+      toast.error('전송하지 못했습니다.', { description: e instanceof Error ? e.message : String(e) })
     }
   }
 
@@ -60,11 +78,23 @@ export function Composer({ disabled, streaming, placeholder, onSend, onStop, sug
       )}
       {pending.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1">
-          {pending.map((f, i) => (
+          {pending.map((p, i) => (
             <span key={i} className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-1.5 py-0.5 text-[11px]">
               <Paperclip className="size-3" />
-              {f.name}
-              <button type="button" aria-label="첨부 제거" onClick={() => setPending((p) => p.filter((_, j) => j !== i))}>
+              {p.file.name}
+              {allowPin && !discussion && (
+                <button
+                  type="button"
+                  className={cn('inline-flex items-center gap-0.5 rounded px-1', p.once ? 'text-muted-foreground' : 'text-primary')}
+                  aria-pressed={!p.once}
+                  onClick={() => setPending((cur) => cur.map((x, j) => (j === i ? { ...x, once: !x.once } : x)))}
+                  title={p.once ? '이번 메시지에만 씁니다. 누르면 대화 입력으로 고정합니다' : '대화 입력(☑ 참고)으로 고정 — 다음 턴에도 AI에 갑니다. 누르면 이번 메시지만'}
+                >
+                  {p.once ? <PinOff className="size-3" /> : <Pin className="size-3" />}
+                  {p.once ? '이번 메시지만' : '입력으로 고정'}
+                </button>
+              )}
+              <button type="button" aria-label="첨부 제거" onClick={() => setPending((cur) => cur.filter((_, j) => j !== i))}>
                 <X className="size-3" />
               </button>
             </span>
@@ -77,7 +107,17 @@ export function Composer({ disabled, streaming, placeholder, onSend, onStop, sug
             <Paperclip />
           </Button>
         )}
-        <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => setPending((p) => [...p, ...Array.from(e.target.files ?? [])])} />
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const picked = Array.from(e.target.files ?? []).map((file) => ({ file, once: false }))
+            setPending((p) => [...p, ...picked])
+            e.target.value = ''
+          }}
+        />
         <Textarea
           value={text}
           onChange={(e) => {
@@ -114,7 +154,7 @@ export function Composer({ disabled, streaming, placeholder, onSend, onStop, sug
             <Square className="size-3.5" />
           </Button>
         ) : (
-          <Button type="button" size="icon-sm" aria-label="전송" onClick={() => void submit()} disabled={!canSend}>
+          <Button type="button" size="icon-sm" aria-label="전송" onClick={() => void submit()} disabled={!canSend} title={blocked ? blockedReason : undefined}>
             <Send />
           </Button>
         )}

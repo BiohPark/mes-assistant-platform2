@@ -98,3 +98,27 @@ describe('export / import roundtrip', () => {
     await expect(importAll({ format: 'x' } as never, database)).rejects.toThrow()
   })
 })
+
+describe('backup secrets', () => {
+  it('never exports the API key or OpenWebUI remote file ids, and import keeps the local key and user', async () => {
+    const s = (await database.settings.get('app'))!
+    await database.settings.put({ ...s, llm: { ...s.llm, apiKey: 'sk-local-secret' } })
+    const f = (await database.files.toArray())[0]
+    await database.files.update(f.id, { remoteIds: { 'http://owui.test#abcd': 'remote-1' } })
+
+    const bundle = await exportAll(database)
+    const json = JSON.stringify(bundle)
+    expect(bundle.version).toBe(3)
+    expect(json).not.toContain('sk-local-secret')
+    expect(json).not.toContain('remote-1')
+
+    const other = new AppDB(`test-${Math.random()}`)
+    await seedDatabase(other)
+    const o = (await other.settings.get('app'))!
+    await other.settings.put({ ...o, currentUserId: 'u_dev2', llm: { ...o.llm, apiKey: 'sk-other-browser' } })
+    await importAll(JSON.parse(json), other)
+    const after = (await other.settings.get('app'))!
+    expect(after.llm.apiKey).toBe('sk-other-browser')
+    expect(after.currentUserId).toBe('u_dev2')
+  })
+})

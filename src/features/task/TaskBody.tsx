@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSettings } from '@/app/hooks'
 import { useIsDesktop } from '@/app/useMediaQuery'
-import { ChatView } from '@/features/chat/ChatView'
+import { ChatView, type InitialMessage } from '@/features/chat/ChatView'
 import { assistantLink1 } from '@/lib/links'
 import { ActivityPanel } from './ActivityPanel'
 import { ChecklistPanel } from './ChecklistPanel'
@@ -13,7 +13,7 @@ import type { TaskData } from './useTaskData'
 
 interface TaskBodyProps {
   data: TaskData
-  initialMessage?: { text: string; attachmentIds: string[] }
+  initialMessage?: InitialMessage
   onInitialSent?: () => void
 }
 
@@ -47,7 +47,7 @@ export function TaskBody({ data, initialMessage, onInitialSent }: TaskBodyProps)
             <Tabs defaultValue="materials" className="flex h-full min-h-0 flex-col">
               <TabsList className="w-full">
                 <TabsTrigger value="materials" className="flex-1">
-                  <FileText /> 자료 <Count n={task.inputs.length} />
+                  <FileText /> 자료 <Count n={task.inputs.length + data.conversationInputs.length} />
                 </TabsTrigger>
                 <TabsTrigger value="checklist" className="flex-1">
                   <ListChecks /> 체크 <Count n={checklistOpen} />
@@ -81,7 +81,7 @@ export function TaskBody({ data, initialMessage, onInitialSent }: TaskBodyProps)
               <MessageSquare /> 대화
             </TabsTrigger>
             <TabsTrigger value="materials">
-              <FileText /> 자료 <Count n={task.inputs.length} />
+              <FileText /> 자료 <Count n={task.inputs.length + data.conversationInputs.length} />
             </TabsTrigger>
             <TabsTrigger value="checklist">
               <ListChecks /> 체크

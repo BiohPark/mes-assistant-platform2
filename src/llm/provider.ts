@@ -37,6 +37,8 @@ export interface ChatMeta {
   assistantName?: string
   taskTitle?: string
   inputFileNames?: string[]
+  /** 사용한 자료 요약 한 줄씩 (Mock 응답이 "사용한 자료" 블록으로 드러낸다) */
+  usedInputs?: string[]
   systemAssistant?: boolean
   srIntake?: boolean
 }

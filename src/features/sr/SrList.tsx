@@ -52,7 +52,7 @@ export function SrList({ items, selectedId, onSelect, onNew, busy }: SrListProps
               <button
                 type="button"
                 aria-label="대화 삭제"
-                className="invisible absolute right-2 bottom-2 text-muted-foreground hover:text-destructive group-hover:visible"
+                className="invisible absolute right-2 bottom-2 text-muted-foreground hover:text-destructive group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
                 onClick={() => setDeleting(sr)}
               >
                 <Trash2 className="size-3.5" />

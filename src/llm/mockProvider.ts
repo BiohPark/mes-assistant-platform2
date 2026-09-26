@@ -15,6 +15,15 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   })
 }
 
+/**
+ * 시연에서 "선택한 자료가 실제로 쓰였는지" 보이도록 매 답변 앞에 붙이는 블록.
+ * 실제 assistant는 이런 블록을 만들지 않는다 — Mock 대역임을 함께 밝힌다.
+ */
+export function usedInputsBlock(lines: string[] | undefined): string {
+  if (!lines?.length) return ''
+  return `> **사용한 자료** (Mock 대역 표시 — 이번 요청에 실제로 담긴 자료)\n${lines.map((l) => `> - ${l}`).join('\n')}\n\n`
+}
+
 /** 단어/구두점 단위로 잘라 스트리밍 느낌을 낸다 */
 function tokenize(text: string): string[] {
   return text.match(/[^\s]+\s*|\s+/g) ?? [text]
@@ -69,10 +78,13 @@ export class MockProvider implements ChatProvider {
         taskTitle: meta.taskTitle ?? '업무',
         assistantName: meta.assistantName ?? '어시스턴트',
         inputFileNames: meta.inputFileNames ?? [],
+        hasInputs: !!meta.usedInputs?.length || !!meta.inputFileNames?.length,
         userText,
         turn: Math.max(0, turn - offset),
       })
     }
+
+    if (!meta.systemAssistant) text = usedInputsBlock(meta.usedInputs) + text
 
     try {
       await sleep(FIRST_TOKEN_DELAY_MS, req.signal)

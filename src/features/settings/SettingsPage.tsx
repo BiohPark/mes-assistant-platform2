@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { setLlmSettings, setSrIntakeAssistant } from '@/db/repositories/settings'
+import { setLlmSettings, setRequestBudget, setSrIntakeAssistant } from '@/db/repositories/settings'
+import { DEFAULT_REQUEST_BUDGET_BYTES } from '@/domain/requestBudget'
 import { exportAll, importAll, validateBundle, type ExportBundle } from '@/db/exportImport'
 import { resetToSeed } from '@/db/seed'
 import { createProvider } from '@/llm'
@@ -45,8 +46,12 @@ function SettingsForm({ settings }: { settings: Settings }) {
   const dirty = settings ? JSON.stringify(settings.llm) !== JSON.stringify(llm) : false
 
   async function save() {
-    await setLlmSettings(llm)
-    toast.success('LLM 설정을 저장했습니다.')
+    try {
+      await setLlmSettings(llm)
+      toast.success('LLM 설정을 저장했습니다.')
+    } catch (e) {
+      toast.error('설정을 저장하지 못했습니다.', { description: e instanceof Error ? e.message : String(e) })
+    }
   }
   async function test() {
     setTesting(true)
@@ -76,9 +81,14 @@ function SettingsForm({ settings }: { settings: Settings }) {
   }
   async function confirmImport() {
     if (!pendingImport) return
-    await importAll(pendingImport)
-    toast.success('데이터를 가져왔습니다.')
-    window.location.reload()
+    try {
+      await importAll(pendingImport)
+      toast.success('데이터를 가져왔습니다.')
+      window.location.reload()
+    } catch (e) {
+      setPendingImport(null)
+      toast.error('가져오지 못했습니다. 기존 데이터는 그대로입니다.', { description: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   return (
@@ -169,10 +179,12 @@ function SettingsForm({ settings }: { settings: Settings }) {
                   <ToggleGroupItem value="inline">텍스트로 붙이기</ToggleGroupItem>
                 </ToggleGroup>
                 <p className="text-[11px] text-muted-foreground">
-                  파일 첨부: 고른 입력 파일을 OpenWebUI Files API(<code>/api/v1/files/</code>)에 올려 채팅 요청에 첨부합니다. assistant가 자체 방식(RAG·워크플로우)으로 읽고, 같은 버전은 다시 올리지 않습니다. 올리기 실패 시 그 파일만 텍스트로 대신 붙이며 "전송 기록"에 남습니다.
-                  텍스트로 붙이기: 텍스트 파일 본문(최대 12,000자)을 프롬프트에 넣습니다(OpenAI 호환 서버·Mock).
+                  파일 첨부: 고른 입력 파일을 OpenWebUI Files API(<code>/api/v1/files/</code>)에 버전을 붙인 이름으로 올리고, 처리가 끝난 뒤 채팅 요청에 첨부합니다. assistant가 자체 방식(검색·워크플로우)으로 읽으며 같은 버전은 다시 올리지 않습니다.
+                  전달에 실패하면 요청을 보내지 않고, 답변 자리에서 다시 시도·파일 빼기·텍스트로 보내기를 고르게 합니다(자동으로 대신 보내지 않음).
+                  텍스트로 붙이기: 텍스트 파일 본문 전체를 프롬프트에 넣습니다(OpenAI 호환 서버·Mock). 텍스트가 아닌 파일은 이름·형식·크기만 갑니다. 참조 대화는 두 방식 모두 본문으로 갑니다.
                 </p>
               </div>
+              <RequestBudgetField bytes={settings.requestBudgetBytes ?? DEFAULT_REQUEST_BUDGET_BYTES} />
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={save} disabled={!dirty}>
                   저장
@@ -184,7 +196,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
                 {testResult && <span className={testResult.ok ? 'text-xs text-emerald-700' : 'text-xs text-destructive'}>{testResult.detail}</span>}
               </div>
               <p className="rounded-lg bg-muted/60 p-2 text-[11px] text-muted-foreground">
-                API 키는 이 브라우저의 IndexedDB에만 저장됩니다. 실서비스에서는 백엔드 프록시를 두고 키를 서버에서 관리해야 합니다.
+                API 키는 이 브라우저의 IndexedDB에만 저장되고, 데이터 내보내기(백업)에는 포함되지 않습니다. 가져오기를 해도 이 브라우저의 키는 유지됩니다. 실서비스에서는 백엔드 프록시를 두고 키를 서버에서 관리해야 합니다.
               </p>
             </div>
           </section>
@@ -280,5 +292,33 @@ function SettingsForm({ settings }: { settings: Settings }) {
         </div>
       </div>
     </>
+  )
+}
+
+/** 요청 크기 한도 (KB). 넘으면 전송을 막고 줄이도록 안내한다 — 자동으로 자르지 않는다 */
+function RequestBudgetField({ bytes }: { bytes: number }) {
+  const [kb, setKb] = useState(String(Math.round(bytes / 1024)))
+  const dirty = Number(kb) * 1024 !== bytes
+  async function save() {
+    try {
+      await setRequestBudget(Number(kb) * 1024)
+      toast.success('요청 크기 한도를 저장했습니다.')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor="budget">요청 크기 한도 (KB)</Label>
+      <div className="flex gap-1.5">
+        <Input id="budget" type="number" min={1} max={16384} value={kb} onChange={(e) => setKb(e.target.value)} className="w-32" />
+        <Button type="button" variant="outline" size="sm" onClick={() => void save()} disabled={!dirty || !kb}>
+          한도 저장
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        보내기 전 요청 본문(대화 이력·본문으로 넣는 파일·참조 대화)의 크기입니다. 넘으면 입력창 위에 안내가 뜨고 전송을 막습니다. 모델의 토큰 한도와는 다르며, OpenWebUI에 첨부로 올리는 파일은 포함되지 않습니다.
+      </p>
+    </div>
   )
 }
