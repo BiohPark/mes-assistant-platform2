@@ -4,7 +4,7 @@
 대화끼리는 **태그(SR 번호·키워드)** 로 느슨하게 연결되고, 같은 태그를 가진 대화의 산출물은 **공유 자료함**에서 발견해 **사람이 고른 것만** AI 입력으로 씁니다.
 백엔드 없이 브라우저 IndexedDB에 저장하고, LLM은 Mock 응답 또는 사내 OpenAI-compatible endpoint를 직접 호출하는 **프론트 전용 데모**입니다.
 
-인수인계: [docs/HANDOFF.md](docs/HANDOFF.md) · 설계: [docs/conversation-hub.md](docs/conversation-hub.md) (현행) · [docs/design.md](docs/design.md) (이전 패키지 모델) · 계획: [docs/superpowers](docs/superpowers)
+인수인계: [docs/HANDOFF.md](docs/HANDOFF.md) · 설계: [docs/conversation-hub.md](docs/conversation-hub.md) (현행) · [docs/fusion-design.md](docs/fusion-design.md) (Codex 비교·융합 설계, 구현 전) · [docs/design.md](docs/design.md) (이전 패키지 모델) · 검증 절차: [docs/evaluation/real-env-verification.md](docs/evaluation/real-env-verification.md) · 계획: [docs/superpowers](docs/superpowers)
 
 ## 실행
 
