@@ -127,9 +127,9 @@
 | 항목 | 권장 | 비고 |
 |---|---|---|
 | DB | PostgreSQL | 사내 표준 DB가 있으면 그쪽. `jsonb` 사용처(activity payload·request snapshot)만 대체 필요 |
-| 서버 | Spring Boot (Java) | 팀 경험 기준. REST + SSE |
+| 서버 | **TypeScript 풀스택 — NestJS + Drizzle** (D20, 2026-09-27) | 데모의 도메인·프롬프트 조립 코드를 서버에서 그대로 재사용. 초안의 Spring Boot는 철회. 상세 [../next-project/architecture.md](../next-project/architecture.md) |
 | 파일 저장 | 로컬 디스크·NAS (`FileStorageService`) | S3 호환 저장소로 바꿀 수 있게 인터페이스 유지 |
-| 인증·권한 | 사내 SSO, 서버에서 요청자 공개 범위 강제 | 데모는 사용자 전환이 시연용 |
+| 인증·권한 | 사내 SSO(OIDC/SAML 표준, D21), 에이전트 관리·전역 설정은 SO만(D19), 요청자 공개 범위 서버 강제 | 데모는 사용자 전환이 시연용 |
 | 실시간 | SSE(응답 스트림) + 필요 시 폴링 | 데모의 탭 간 liveQuery 대체 |
 | OpenWebUI | 서버가 대리 호출, 키는 서버 비밀 | CORS 불필요 |
-| 미확정 정책 | [fusion-design.md](../fusion-design.md) §6 | 현업 시험([ux-test-script.md](../evaluation/ux-test-script.md)) 뒤 확정 |
+| 정책 | [fusion-design.md](../fusion-design.md) §6 | 추천값대로 확정 (D18, 2026-09-27 — 현업 시험은 이전 버전 시험으로 대신) |
