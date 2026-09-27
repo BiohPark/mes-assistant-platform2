@@ -2,7 +2,7 @@
 
 다른 세션(사람 또는 AI)이 이어서 작업할 수 있도록 컨셉·현재 상태·결정 사항·남은 일·주의점을 한곳에 정리한다.
 기준 시점: 2026-09-23, `master` = `feat/platform-scope` 머지 직후.
-추가(2026-09-26): 형제 저장소(Codex)와의 비교·융합 설계와 진행 방식 판단은 [fusion-design.md](fusion-design.md). 이 저장소는 **데모로 마무리**하고 실제 구현은 별도 저장소에서 한다(D16). 추천안 2-b(짧은 UX 검증 스프린트)를 `feat/ux-sprint`에서 반영해 master에 병합·push했다(D17, 2026-09-26) — 결과 [evaluation/context-flow.md](evaluation/context-flow.md), 새 저장소 기준 데이터 계약 [architecture/data-contract.md](architecture/data-contract.md).
+추가(2026-09-26): 형제 저장소(Codex)와의 비교·융합 설계와 진행 방식 판단은 [fusion-design.md](fusion-design.md). 이 저장소는 **데모로 마무리**하고 실제 구현은 별도 저장소에서 한다(D16). 추천안 2-b(짧은 UX 검증 스프린트)를 `feat/ux-sprint`에서 반영해 master에 병합·push했다(D17, 2026-09-26) — 결과 [evaluation/context-flow.md](evaluation/context-flow.md). 2026-09-27: 정책 확정(D18)·스택(D20)·인증(D21) 결정, 데모 동결 태그 `demo-final`. **새 저장소 착수 자료: [next-project/README.md](next-project/README.md)** (PRD·아키텍처·OpenAPI, 데이터 계약·DDL).
 
 ---
 
@@ -94,6 +94,10 @@ src/
 | D15 | 대화 간 컨텍스트: **같은 태그를 직접 공유하는 대화를 파일처럼 통째로 선택**하고 필요하면 메시지 선택·요약으로 세부 조절. 기본은 전체 원문. 단계·순서를 참조 조건으로 쓰지 않음(순서 기반 인계·"인계 메모"·"다음 단계로 넘기기" 없음). 자동 절단·자동 요약·재귀 수집 금지 | 사용자 (2026-09-26, Codex 논의에서 확정) |
 | D16 | 이 저장소는 데모로 마무리하고 실제 구현은 별도 저장소에서 진행 | 사용자 (2026-09-26) |
 | D17 | 진행 방식 2-b(새 저장소로 넘어갈 UX만 데모에서 검증) 채택. [fusion-design.md](fusion-design.md) §6의 추천 정책을 기본값으로 적용 — 현업 시험 후 확정. **D10 변경**: 파일 전달 실패 시 자동 인라인 대신 요청 중단 + 항목별 선택 | 사용자 "추천대로 진행" (2026-09-26) |
+| D18 | 미확정 정책 12개를 추천값대로 확정 (현업 시험은 이전 버전 시험으로 대신) | 사용자 (2026-09-27) |
+| D19 | 에이전트 관리(추가·수정·삭제·순서)와 전역 설정은 System Owner만 — 새 저장소에서 서버 강제 (데모는 인증이 없어 그대로) | 사용자 (2026-09-27) |
+| D20 | 새 저장소 스택: TypeScript 풀스택(React + NestJS + PostgreSQL + Drizzle) — 데모 소스 재사용 우선, Spring 초안 철회 | 사용자 요청 기준으로 결정 (2026-09-27) |
+| D21 | 인증: 사내 SSO(OIDC/SAML 표준)의 수신 측만 구현, 역할은 앱이 관리, 개발은 Keycloak 대역 | 사용자 (2026-09-27) |
 
 ## 6. 진행 현황
 
@@ -112,9 +116,9 @@ src/
 ### 남은 일 / 미결정
 | 우선 | 항목 | 메모 |
 |---|---|---|
-| 결정 필요 | **관리 페이지 수정 권한** — 현재 누구나 에이전트 추가·수정·삭제 가능(홈 편집 모드는 SO만) | SO만 / 담당자+SO 중 선택 대기 |
-| 결정 필요 | **System Owner 지정 UI** — 지금은 시드 또는 JSON 내보내기→`isSystemOwner` 수정→가져오기로만 변경 | 설정 화면에 추가 여부 |
-| **다음** | **현업 UX 시험 → 정책 확정 → 데모 동결(`demo-final`) → 새 저장소 착수** | [evaluation/ux-test-script.md](evaluation/ux-test-script.md). 정책은 추천값으로 적용 중(D17) |
+| 완료(결정) | 관리 페이지 수정 권한 → **System Owner만**(D19). SO 지정 UI는 새 저장소 관리 화면에서 SO가 지정 | 데모는 인증이 없어 적용하지 않음 |
+
+| **다음** | **새 저장소 착수** — 현업 시험 생략·정책 확정(D18)·데모 동결(`demo-final`) 완료 | [next-project/README.md](next-project/README.md). 첫 스프린트에서 실제 OpenWebUI 확인 |
 | 높음 | **실제 사내 OpenWebUI 연동 확인** — CORS 허용 필요, Files API 응답 형식·`files` 파라미터 동작, 모델 ID 매핑 | 가짜 서버로만 검증됨 |
 | 높음 | 인증 없음 — 사용자 전환은 시연용(누구나 SO 가능). 운영 시 사내 SSO 연동 필요 | |
 | 중간 | assistant가 **생성한 파일**을 플랫폼 산출물로 받는 경로 — 현재는 답변 텍스트를 "산출물로 저장"만 | OpenWebUI 응답의 파일 참조 처리 |

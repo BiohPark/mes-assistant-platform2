@@ -58,7 +58,7 @@
    - API 키가 백업에 포함되는 문제 차단
 2. 저장 계층 전면 정규화, lease·fencing, 파일 저장소 구현체는 데모에서 하지 않는다. §8의 데이터 계약·DDL·API 문서로 옮기고 새 저장소에서 서버 기준으로 구현한다.
 3. 현업 2–3명이 대표 과업(§6 E6)으로 시험해 미확정 정책(§5)을 확정한 뒤 데모를 동결한다(예: 태그 `demo-final`).
-4. 새 저장소: 서버(예: Spring Boot) + DB + **파일은 디스크·NAS에 파일 그대로**. 프론트는 platform2의 `domain`·`llm`·`components`·`features`를 이식하고, `db/repositories`는 같은 시그니처의 API 클라이언트로 바꾼다.
+4. 새 저장소: 서버(TypeScript 풀스택 — NestJS, D20) + DB + **파일은 디스크·NAS에 파일 그대로**. 프론트는 platform2의 `domain`·`llm`·`components`·`features`를 이식하고, `db/repositories`는 같은 시그니처의 API 클라이언트로 바꾼다. 착수 자료: [next-project/](next-project/README.md)
 
 경우 1을 그대로 하는 것은 "새 저장소 착수가 한참 뒤이고 데모를 실사용"할 때만 권한다.
 
@@ -219,7 +219,7 @@
 
 ---
 
-## 6. 미확정 정책과 추천 기본값
+## 6. 정책 (2026-09-27 추천값대로 확정 — D18)
 
 | # | 정책 | 선택지와 장단점 | 추천 기본값 |
 |---|---|---|---|
@@ -329,7 +329,7 @@
 | Mock "사용한 자료" 블록, 항상 보이는 액션(포커스·터치), 조용한 실패 제거, SR 결과 공유 파일 후보 | 완료 | 각 화면 |
 | 데이터 계약·DDL·API 대응표 (§8) | 문서 완료 | [architecture/data-contract.md](architecture/data-contract.md), [architecture/postgres-draft.sql](architecture/postgres-draft.sql) |
 | 폰트(Pretendard)·다크 모드·자료함 외 칸반 열 개별 접기 | **하지 않음** | 새 저장소로 이월되는 시각 작업이지만 검증 목적과 무관해 보류 |
-| 현업 UX 시험 → 정책 확정 → 데모 동결 | **남음** | [evaluation/ux-test-script.md](evaluation/ux-test-script.md) |
+| 현업 UX 시험 → 정책 확정 → 데모 동결 | 현업 시험은 생략(이전 버전에서 시험함), 정책은 추천값대로 확정(D18), 데모 동결 태그 `demo-final` | [next-project/](next-project/README.md) |
 
 ## 11. 관련 문서
 
